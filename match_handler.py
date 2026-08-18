@@ -1,3 +1,5 @@
+from database_handler import db
+
 class MatchHandler:
     def __init__(self):
         # Only matches involving registered players.
@@ -9,19 +11,15 @@ class MatchHandler:
         #     }
         # }
         self.matches = {}
-        self.registered_profiles = {}
 
     def update(self, ongoing_matches):
-        print ("Got a match update")
-        return
-    
         current_ids = set()
 
         for match in ongoing_matches:
             match_id = match["matchId"]
 
             # Is anyone in this match one of our registered players?
-            if not self._is_interesting(match, self.registered_profiles):
+            if not self.is_registered(match):
                 continue
 
             current_ids.add(match_id)
@@ -36,9 +34,9 @@ class MatchHandler:
                     "message_id": None,
                 }
 
-    def _is_interesting(self, match):
+    def is_registered(self, match):
         return any(
-            player["profileId"] in self.registered_profiles
+            player["profileId"] in db.members
             for player in match["players"]
         )
 

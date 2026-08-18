@@ -1,12 +1,9 @@
 import discord
 from discord import app_commands
-from database import DatabaseHandler
+from database_handler import db
 import os
 
 GUILD_ID = os.environ ["GUILD_ID"]
-
-db = DatabaseHandler("data/bot.db")
-db.check_integrity()
 
 class DiscordBot(discord.Client):
     def __init__(self):

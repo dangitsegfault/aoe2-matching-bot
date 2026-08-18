@@ -1,15 +1,10 @@
-# CREATE TABLE members (
-#     discord_id INTEGER PRIMARY KEY,
-#     aoe2_profile_id INTEGER NOT NULL UNIQUE,
-#     added_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-# );
-
 import sqlite3
 from pathlib import Path
 
 class DatabaseHandler:
     def __init__(self, db_path=""):
         self.db_path = Path(db_path)
+        self.members = {}
 
     def check_integrity(self):
         if not self.db_path.exists():
@@ -46,15 +41,13 @@ class DatabaseHandler:
                     (discord_id, aoe2_profile_id),
                 )
 
+            self.members.setdefault(discord_id, []).append(aoe2_profile_id)
             return True
 
         except sqlite3.IntegrityError:
             return False
 
-    def get_member():
-        return
-
-    def get_all_members(self):
+    def read_all_members_in_db(self):
         with sqlite3.connect(self.db_path) as db:
             rows = db.execute("""
                 SELECT discord_id, aoe2_profile_id
@@ -67,10 +60,7 @@ class DatabaseHandler:
         for discord_id, profile_id in rows:
             members.setdefault(discord_id, []).append(profile_id)
 
-        return members
-
-    def update_member():
-        return
+        self.members = members
 
     def remove_member(self, discord_id, aoe2_profile_id):
         with sqlite3.connect(self.db_path) as db:
@@ -82,5 +72,19 @@ class DatabaseHandler:
                 (discord_id, aoe2_profile_id),
             )
 
-            return cursor.rowcount > 0
+        if cursor.rowcount > 0:
+            profiles = self.members.get(discord_id)
 
+            if profiles:
+                profiles.remove(aoe2_profile_id)
+
+                if not profiles:
+                    del self.members[discord_id]
+
+            return True
+
+        return False
+
+db = DatabaseHandler("data/bot.db")
+db.check_integrity()
+db.read_all_members_in_db()
