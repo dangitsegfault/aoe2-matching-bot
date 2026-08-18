@@ -51,9 +51,6 @@ class DatabaseHandler:
         except sqlite3.IntegrityError:
             return False
 
-    def remove_member():
-        return
-
     def get_member():
         return
 
@@ -74,3 +71,16 @@ class DatabaseHandler:
 
     def update_member():
         return
+
+    def remove_member(self, discord_id, aoe2_profile_id):
+        with sqlite3.connect(self.db_path) as db:
+            cursor = db.execute(
+                """
+                DELETE FROM members
+                WHERE discord_id = ? AND aoe2_profile_id = ?
+                """,
+                (discord_id, aoe2_profile_id),
+            )
+
+            return cursor.rowcount > 0
+
