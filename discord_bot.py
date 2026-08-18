@@ -15,13 +15,6 @@ class DiscordBot(discord.Client):
 
         self.tree = app_commands.CommandTree(self)
 
-    # async def setup_hook(self):
-    #     commands = await self.tree.sync()
-
-    #     print("Synced commands:")
-    #     for command in commands:
-    #         print(f"  /{command.name}")
-
     async def setup_hook(self):
         guild = discord.Object(id=GUILD_ID)
 
