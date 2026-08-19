@@ -2,7 +2,6 @@ import asyncio
 import json
 import websockets
 
-
 class WebSocketHandler:
     def __init__(self, url, match_handler, socket_size = 10*1024*1024):
         self.url = url
@@ -21,7 +20,7 @@ class WebSocketHandler:
 
                     async for message in websocket:
                         data = json.loads(message)
-                        self.match_handler.update(data)
+                        await self.match_handler.extract_target_matches(data)
 
             except (
                 websockets.ConnectionClosed,

@@ -85,6 +85,46 @@ class DatabaseHandler:
 
         return False
 
+    def is_member(self, profile_id):
+        return any(
+            profile_id in profiles
+            for profiles in self.members.values()
+        )
+
+    def set_spectate_channel(self, guild_id, channel_id):
+        with sqlite3.connect(self.db_path) as db:
+            db.execute("""
+                INSERT INTO settings (guild_id, spectate_channel_id)
+                VALUES (?, ?)
+                ON CONFLICT(guild_id) DO UPDATE SET
+                    spectate_channel_id = excluded.spectate_channel_id
+            """, (guild_id, channel_id))
+
+    def set_lobby_channel(self, guild_id, channel_id):
+        with sqlite3.connect(self.db_path) as db:
+            db.execute("""
+                INSERT INTO settings (guild_id, lobby_channel_id)
+                VALUES (?, ?)
+                ON CONFLICT(guild_id) DO UPDATE SET
+                    lobby_channel_id = excluded.lobby_channel_id
+            """, (guild_id, channel_id))
+
+    def get_channel_ids(self):
+        with sqlite3.connect(self.db_path) as db:
+            row = db.execute("""
+                SELECT guild_id, spectate_channel_id, lobby_channel_id
+                FROM settings
+            """).fetchone()
+
+        if row is None:
+            return None
+
+        return {
+            "guild_id": row[0],
+            "spectate_channel_id": row[1],
+            "lobby_channel_id": row[2],
+        }
+
 db = DatabaseHandler("data/bot.db")
 db.check_integrity()
 db.read_all_members_in_db()

@@ -11,6 +11,8 @@ class DiscordBot(discord.Client):
         super().__init__(intents=intents)
 
         self.tree = app_commands.CommandTree(self)
+        self.spectate_channel = None
+        self.lobby_channel = None
 
     async def setup_hook(self):
         guild = discord.Object(id=GUILD_ID)
@@ -24,6 +26,50 @@ class DiscordBot(discord.Client):
 
     async def on_ready(self):
         print(f"Logged in as {self.user}")
+
+        settings = db.get_channel_ids()
+
+        if settings:
+            self.spectate_channel = self.get_channel(
+                settings["spectate_channel_id"]
+            )
+
+            self.lobby_channel = self.get_channel(
+                settings["lobby_channel_id"]
+            )
+
+
+    def make_match_view(self, match_id):
+        view = discord.ui.View()
+
+        # view.add_item(
+        #     discord.ui.Button(
+        #         label="Spectate",
+        #         url=f"aoe2de://1/{match_id}",
+        #     )
+        # )
+
+        # return view
+
+    async def send_match_message(self, content, match_id):
+        settings = db.get_channel_ids()
+
+        message = await self.spectate_channel.send(
+            content=content,
+            view=self.make_match_view(match_id),
+        )
+        return message.id
+
+    async def update_match_message(self, message_id, content):
+        settings = db.get_channel_ids()
+
+        message = await self.spectate_channel.fetch_message(message_id)
+
+        await message.edit(
+            content=content,
+            view=None,
+        )
+
 
 bot = DiscordBot()
 
@@ -57,7 +103,7 @@ async def register(
 )
 @app_commands.checks.has_permissions(administrator=True)
 async def members(interaction: discord.Interaction):
-    members = db.get_all_members()
+    members = db.members
 
     if not members:
         await interaction.response.send_message(
@@ -114,9 +160,9 @@ async def unregister(
 )
 @app_commands.checks.has_permissions(administrator=True)
 async def privileged_register(
-    interaction: discord.Interaction,
-    user: discord.Member,
-    profile_id: int,
+        interaction: discord.Interaction,
+        user: discord.Member,
+        profile_id: int,
 ):
     success = db.add_member(
         user.id,
@@ -142,9 +188,9 @@ async def privileged_register(
 )
 @app_commands.checks.has_permissions(administrator=True)
 async def privileged_unregister(
-    interaction: discord.Interaction,
-    user: discord.Member,
-    profile_id: int,
+        interaction: discord.Interaction,
+        user: discord.Member,
+        profile_id: int,
 ):
     success = db.remove_member(
         user.id,
@@ -159,3 +205,38 @@ async def privileged_unregister(
         await interaction.response.send_message(
             "That AoE2 profile is not registered to that member."
         )
+
+@bot.tree.command(
+    name="set_spectate_channel",
+    description="Set this channel for spectate messages"
+)
+@app_commands.checks.has_permissions(administrator=True)
+async def set_spectate_channel(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
+    channel_id = interaction.channel.id
+
+    db.set_spectate_channel(guild_id, channel_id)
+
+    bot.spectate_channel = interaction.channel
+
+    await interaction.response.send_message(
+        f"Spectate channel set to {interaction.channel.mention}."
+    )
+
+
+@bot.tree.command(
+    name="set_lobby_channel",
+    description="Set this channel for lobby messages"
+)
+@app_commands.checks.has_permissions(administrator=True)
+async def set_lobby_channel(interaction: discord.Interaction):
+    guild_id = interaction.guild.id
+    channel_id = interaction.channel.id
+
+    db.set_lobby_channel(guild_id, channel_id)
+
+    bot.lobby_channel = interaction.channel
+
+    await interaction.response.send_message(
+        f"Lobby channel set to {interaction.channel.mention}."
+    )
