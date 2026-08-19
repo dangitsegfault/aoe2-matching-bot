@@ -76,39 +76,43 @@ class MatchHandler:
     def make_match_message(self, match_data):
         players = match_data["players"]
 
-        team_1 = [p for p in players if p["team"] == 1]
-        team_2 = [p for p in players if p["team"] == 2]
+        teams = {}
+
+        for player in players:
+            team = player["team"]
+            teams.setdefault(team, []).append(player)
 
         lines = [
             f"Game started {match_data['started']}",
             f"**{match_data['name']}**",
             f"Map: {match_data['mapName']}",
             "",
-            "**Team 1**",
         ]
 
-        for player in team_1:
-            lines.append(f" {player['name']}")
+        # Unassigned players first
+        if "-" in teams:
+            lines.append("**Team -**")
+            for player in teams["-"]:
+                lines.append(
+                    f"{player['name']} — {player['civName']}"
+                )
+            lines.append("")
 
-        lines.append("")
-        lines.append("**Civ**")
+        # Teams 1 through 8
+        for team_number in range(1, 9):
+            if team_number not in teams:
+                continue
 
-        for player in team_1:
-            lines.append(player["civName"])
+            lines.append(f"**Team {team_number}**")
 
-        lines.append("")
-        lines.append("**Team 2**")
+            for player in teams[team_number]:
+                lines.append(
+                    f"{player['name']} — {player['civName']}"
+                )
 
-        for player in team_2:
-            lines.append(f" {player['name']}")
+            lines.append("")
 
-        lines.append("")
-        lines.append("**Civ**")
-
-        for player in team_2:
-            lines.append(player["civName"])
-
-        return "\n".join(lines)
+        return "\n".join(lines).rstrip()
 
     def make_match_ended_message(self, match_data):
         return f"Match `{match_data['matchId']}` has ended."
