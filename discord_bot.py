@@ -27,18 +27,6 @@ class DiscordBot(discord.Client):
     async def on_ready(self):
         print(f"Logged in as {self.user}")
 
-        settings = db.get_channel_ids()
-
-        if settings:
-            self.spectate_channel = self.get_channel(
-                settings["spectate_channel_id"]
-            )
-
-            self.lobby_channel = self.get_channel(
-                settings["lobby_channel_id"]
-            )
-
-
     def make_match_view(self, match_id):
         view = discord.ui.View()
 
@@ -51,19 +39,46 @@ class DiscordBot(discord.Client):
 
         # return view
 
-    async def send_match_message(self, content, match_id):
-        settings = db.get_channel_ids()
+    async def send_match_message(self, content, match_id, guild_id):
+        settings = db.get_channel_ids(guild_id)
 
-        message = await self.spectate_channel.send(
+        if settings is None:
+            return None
+
+        channel_id = settings["spectate_channel_id"]
+
+        if channel_id is None:
+            return None
+
+        channel = self.get_channel(channel_id)
+
+        if channel is None:
+            channel = await self.fetch_channel(channel_id)
+
+        message = await channel.send(
             content=content,
             view=self.make_match_view(match_id),
         )
+
         return message.id
 
-    async def update_match_message(self, message_id, content):
-        settings = db.get_channel_ids()
+    async def update_match_message(self, message_id, guild_id, content):
+        settings = db.get_channel_ids(guild_id)
 
-        message = await self.spectate_channel.fetch_message(message_id)
+        if settings is None:
+            return
+
+        channel_id = settings["spectate_channel_id"]
+
+        if channel_id is None:
+            return
+
+        channel = self.get_channel(channel_id)
+
+        if channel is None:
+            channel = await self.fetch_channel(channel_id)
+
+        message = await channel.fetch_message(message_id)
 
         await message.edit(
             content=content,
@@ -84,8 +99,9 @@ async def register(
         profile_id: int,
 ):
     success = db.add_member(
+        interaction.guild_id,
         interaction.user.id,
-        profile_id,
+        profile_id
     )
 
     if success:
@@ -103,7 +119,7 @@ async def register(
 )
 @app_commands.checks.has_permissions(administrator=True)
 async def members(interaction: discord.Interaction):
-    members = db.members
+    members = db.read_all_members_by_guild (interaction.guild.id)
 
     if not members:
         await interaction.response.send_message(
@@ -137,6 +153,7 @@ async def unregister(
         profile_id: int,
 ):
     success = db.remove_member(
+        interaction.guild.id,
         interaction.user.id,
         profile_id,
     )
@@ -165,6 +182,7 @@ async def privileged_register(
         profile_id: int,
 ):
     success = db.add_member(
+        interaction.guild.id,
         user.id,
         profile_id,
     )
@@ -193,6 +211,7 @@ async def privileged_unregister(
         profile_id: int,
 ):
     success = db.remove_member(
+        interaction.guild.id,
         user.id,
         profile_id,
     )
@@ -222,7 +241,6 @@ async def set_spectate_channel(interaction: discord.Interaction):
     await interaction.response.send_message(
         f"Spectate channel set to {interaction.channel.mention}."
     )
-
 
 @bot.tree.command(
     name="set_lobby_channel",
