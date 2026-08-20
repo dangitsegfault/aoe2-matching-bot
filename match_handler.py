@@ -1,6 +1,7 @@
 import asyncio
 from database_handler import db
 from discord_bot import bot
+from datetime import datetime
 
 class MatchHandler:
     def __init__(self):
@@ -95,8 +96,15 @@ class MatchHandler:
             team = player["team"]
             teams.setdefault(team, []).append(player)
 
+
+        dt = datetime.fromisoformat(
+            match_data["started"].replace("Z", "+00:00")
+        )
+
+        discord_timestamp = int(dt.timestamp())
+
         lines = [
-            f"Game started {match_data['started']}",
+            f"Game started <t:{discord_timestamp}:F>",
             f"**{match_data['name']}**",
             f"Map: {match_data['mapName']}",
             "",
