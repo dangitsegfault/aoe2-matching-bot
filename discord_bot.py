@@ -4,6 +4,7 @@ from database_handler import db
 import os
 
 GUILD_ID = os.environ ["GUILD_ID"]
+REDIRECT_URL = os.environ ["REDIRECT_URL"]
 
 class DiscordBot(discord.Client):
     def __init__(self):
@@ -30,14 +31,14 @@ class DiscordBot(discord.Client):
     def make_match_view(self, match_id):
         view = discord.ui.View()
 
-        # view.add_item(
-        #     discord.ui.Button(
-        #         label="Spectate",
-        #         url=f"aoe2de://1/{match_id}",
-        #     )
-        # )
+        view.add_item(
+            discord.ui.Button(
+                label="Spectate",
+                url=f"{REDIRECT_URL}/spectate/{match_id}",
+            )
+        )
 
-        # return view
+        return view
 
     async def send_match_message(self, content, match_id, guild_id):
         settings = db.get_channel_ids(guild_id)
