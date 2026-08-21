@@ -40,7 +40,7 @@ class DiscordBot(discord.Client):
 
         return view
 
-    async def send_match_message(self, content, match_id, guild_id):
+    async def send_match_message(self, content, embed, match_id, guild_id):
         settings = db.get_channel_ids(guild_id)
 
         if settings is None:
@@ -58,6 +58,7 @@ class DiscordBot(discord.Client):
 
         message = await channel.send(
             content=content,
+            embed=embed,
             view=self.make_match_view(match_id),
         )
 

@@ -2,6 +2,7 @@ import asyncio
 from database_handler import db
 from discord_bot import bot
 from datetime import datetime
+import discord
 
 class MatchHandler:
     def __init__(self):
@@ -43,7 +44,8 @@ class MatchHandler:
 
                     # New match.
                     # send a message to the server and store its message id
-                    content = self.make_match_message(match_data)
+                    content = self.make_match_content(match_data)
+                    embed = self.make_match_embedd(match_data)
 
                     guild_ids = set()
 
@@ -66,6 +68,7 @@ class MatchHandler:
                     for guild_id in guild_ids:
                         message_id = await bot.send_match_message(
                             content,
+                            embed,
                             match_id,
                             guild_id,
                         )
@@ -98,16 +101,7 @@ class MatchHandler:
             for player in match_data["players"]
         )
 
-    def make_match_message(self, match_data):
-        players = match_data["players"]
-
-        teams = {}
-
-        for player in players:
-            team = player["team"]
-            teams.setdefault(team, []).append(player)
-
-
+    def make_match_content(self, match_data):
         dt = datetime.fromisoformat(
             match_data["started"].replace("Z", "+00:00")
         )
@@ -116,43 +110,42 @@ class MatchHandler:
 
         lines = [
             f"Game started <t:{discord_timestamp}:F>",
-            "",
-            f"**{match_data['name']}**",
-            "",
-            f"Map: {match_data['mapName']}",
-            "",
+            ""
         ]
 
-        # Unassigned players first
-        if "-" in teams:
-            lines.append("**Team -**")
-            for player in teams["-"]:
-                emoji = self.PLAYER_EMOJIS[player["color"]]
-
-                lines.append(
-                    f"{emoji} {player['name']} — {player['civName']}"
-                )
-                lines.append("")
-
-        # Teams 1 through 8
-        for team_number in range(1, 9):
-            if team_number not in teams:
-                continue
-
-            lines.append(f"**Team {team_number}**")
-
-            for player in teams[team_number]:
-                emoji = self.PLAYER_EMOJIS[player["color"]]
-
-                lines.append(
-                    f"{emoji} {player['name']} — {player['civName']}"
-                )
-
-            lines.append("")
-
-        lines.append("")
-
         return "\n".join(lines).rstrip()
+
+
+    def make_match_embedd(self, match_data):
+        embed = discord.Embed(title=match_data['name'])
+        embed.description = f"Map: {match_data['mapName']}"
+
+        players = match_data["players"]
+        teams = {}
+        for player in players:
+            teams.setdefault(player["team"], []).append(player)
+
+        def add_team_columns(team_label, team_players):
+            names_col = "\n".join(
+                f"{self.PLAYER_EMOJIS[p['color']]} {p['name'] or 'Unknown'}"
+                for p in team_players
+            ) + "\n\u200b"
+
+            civ_col = "\n".join(
+                    p["civName"] or "-"
+                    for p in team_players
+                ) + "\n\u200b"
+
+            embed.add_field(name=team_label, value=names_col, inline=True)
+            embed.add_field(name="Civ", value=civ_col, inline=True)
+            embed.add_field(name="\u200b", value="\u200b", inline=True)
+
+        # "-" sorts first, then numeric teams in order
+        for team_key in sorted(teams, key=lambda t: (0, 0) if t == "-" else (1, t)):
+            label = "Team -" if team_key == "-" else f"Team {team_key}"
+            add_team_columns(label, teams[team_key])
+
+        return embed
 
     def make_match_ended_message(self, match_data):
         return f"Match `{match_data['matchId']}` has ended."
