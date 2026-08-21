@@ -1,17 +1,29 @@
 # scriipt  to keep constant connection to the aoe2companion websocket and i can connect my code to a local websocket for development so that i do no abuse the aoe2companions socket by restarting my scripts
 
+# Script to keep constant connections to the AoE2 Companion WebSockets
+# so development restarts don't repeatedly reconnect to the service.
+
 import asyncio
 import websockets
 
-AOE2_COMPANION_URL = "wss://socket.aoe2companion.com/listen?handler=ongoing-matches"
-LOCAL_HOST = "127.0.0.1"
-LOCAL_PORT = 8765
 
-clients = set()
-latest_message = None
+CONNECTIONS = [
+    {
+        "name": "ongoing-matches",
+        "aoe2_url": "wss://socket.aoe2companion.com/listen?handler=ongoing-matches",
+        "local_host": "127.0.0.1",
+        "local_port": 8765,
+    },
+    {
+        "name": "lobbies",
+        "aoe2_url": "wss://socket.aoe2companion.com/listen?handler=lobbies",
+        "local_host": "127.0.0.1",
+        "local_port": 8766,
+    },
+]
 
 
-async def broadcast(message):
+async def broadcast(clients, message):
     if not clients:
         return
 
@@ -21,54 +33,74 @@ async def broadcast(message):
     )
 
 
-async def aoe2_connection():
-    global latest_message
-
+async def aoe2_connection(connection, clients, state):
     while True:
         try:
             async with websockets.connect(
-                AOE2_COMPANION_URL,
+                connection["aoe2_url"],
                 max_size=None,
             ) as websocket:
-                print("Connected to AoE2 Companion.")
+                print(f"Connected to AoE2 Companion: {connection['name']}")
 
                 async for message in websocket:
-                    latest_message = message
-                    await broadcast(message)
+                    state["latest_message"] = message
+                    await broadcast(clients, message)
 
         except Exception as e:
-            print(f"AoE2 connection lost: {e}")
+            print(
+                f"{connection['name']} connection lost: {e}"
+            )
             await asyncio.sleep(5)
 
 
-async def client_connection(websocket):
+async def client_connection(websocket, clients, state, name):
     clients.add(websocket)
-    print("Bot connected.")
+    print(f"Bot connected to {name}.")
 
     try:
-        if latest_message is not None:
-            await websocket.send(latest_message)
+        if state["latest_message"] is not None:
+            await websocket.send(state["latest_message"])
 
         await websocket.wait_closed()
 
     finally:
-        clients.remove(websocket)
-        print("Bot disconnected.")
+        clients.discard(websocket)
+        print(f"Bot disconnected from {name}.")
 
 
-async def main():
+async def run_connection(connection):
+    clients = set()
+
+    state = {
+        "latest_message": None,
+    }
+
     server = await websockets.serve(
-        client_connection,
-        LOCAL_HOST,
-        LOCAL_PORT,
+        lambda websocket: client_connection(
+            websocket,
+            clients,
+            state,
+            connection["name"],
+        ),
+        connection["local_host"],
+        connection["local_port"],
         max_size=None,
     )
 
-    print(f"Forwarder listening on ws://{LOCAL_HOST}:{LOCAL_PORT}")
+    print(
+        f"{connection['name']} forwarder listening on "
+        f"ws://{connection['local_host']}:{connection['local_port']}"
+    )
 
     await asyncio.gather(
         server.wait_closed(),
-        aoe2_connection(),
+        aoe2_connection(connection, clients, state),
+    )
+
+
+async def main():
+    await asyncio.gather(
+        *(run_connection(connection) for connection in CONNECTIONS)
     )
 
 

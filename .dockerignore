@@ -1,0 +1,21 @@
+__pycache__/
+*.pyc
+.env
+.git/
+.gitignore
+venv/
+*.log
+*.json
+*.*~
+data/
+
+# Emacs
+*~
+\#*\#
+.\#*
+.emacs.desktop
+.emacs.desktop.lock
+*.elc
+auto-save-list/
+tramp
+.projectile
