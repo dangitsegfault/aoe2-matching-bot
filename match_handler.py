@@ -16,6 +16,17 @@ class MatchHandler:
         # }
         self.matches = {}
 
+        self.PLAYER_EMOJIS = {
+            1: "<:player1:1540294289710522430>",
+            2: "<:player2:1540294287772885022>",
+            3: "<:player3:1540294285839171594>",
+            4: "<:player4:1540294283670855700>",
+            5: "<:player5:1540294281540141066>",
+            6: "<:player6:1540294279698710578>",
+            7: "<:player7:1540294277782048808>",
+            8: "<:player8:1540294275890417744>",
+        }
+
     async def extract_target_matches(self, ongoing_matches):
         for match in ongoing_matches:
             match_data = match["data"]
@@ -105,7 +116,9 @@ class MatchHandler:
 
         lines = [
             f"Game started <t:{discord_timestamp}:F>",
+            "",
             f"**{match_data['name']}**",
+            "",
             f"Map: {match_data['mapName']}",
             "",
         ]
@@ -114,8 +127,10 @@ class MatchHandler:
         if "-" in teams:
             lines.append("**Team -**")
             for player in teams["-"]:
+                emoji = self.PLAYER_EMOJIS[player["color"]]
+
                 lines.append(
-                    f"{player['name']} — {player['civName']}"
+                    f"{emoji} {player['name']} — {player['civName']}"
                 )
                 lines.append("")
 
@@ -127,11 +142,15 @@ class MatchHandler:
             lines.append(f"**Team {team_number}**")
 
             for player in teams[team_number]:
+                emoji = self.PLAYER_EMOJIS[player["color"]]
+
                 lines.append(
-                    f"{player['name']} — {player['civName']}"
+                    f"{emoji} {player['name']} — {player['civName']}"
                 )
 
             lines.append("")
+
+        lines.append("")
 
         return "\n".join(lines).rstrip()
 
