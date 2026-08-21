@@ -3,8 +3,8 @@ from discord import app_commands
 from database_handler import db
 import os
 
-GUILD_ID = os.environ ["GUILD_ID"]
 REDIRECT_URL = os.environ ["REDIRECT_URL"]
+DEV_GUILD_ID = os.environ.get("DEV_GUILD_ID")
 
 class DiscordBot(discord.Client):
     def __init__(self):
@@ -16,12 +16,15 @@ class DiscordBot(discord.Client):
         self.lobby_channel = None
 
     async def setup_hook(self):
-        guild = discord.Object(id=GUILD_ID)
+        if DEV_GUILD_ID:
+            guild = discord.Object(id=DEV_GUILD_ID)
+            self.tree.copy_global_to(guild=guild)
+            commands = await self.tree.sync(guild=guild)
+            print(f"Synced commands to dev guild {DEV_GUILD_ID}:")
+        else:
+            commands = await self.tree.sync()
+            print("Synced commands globally:")
 
-        self.tree.copy_global_to(guild=guild)
-        commands = await self.tree.sync(guild=guild)
-
-        print("Synced commands:")
         for command in commands:
             print(f"  /{command.name}")
 
