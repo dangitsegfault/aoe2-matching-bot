@@ -2,8 +2,8 @@ import sqlite3
 from pathlib import Path
 import os
 
-DB_FILE=os.environ.get ("DB_FILE_PATH", "/app/data/bot.db")
-os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+DB_FILE_PATH="/app/data/bot.db"
+os.makedirs(os.path.dirname(DB_FILE_PATH), exist_ok=True)
 
 class DatabaseHandler:
     def __init__(self, db_path=""):
@@ -153,5 +153,5 @@ class DatabaseHandler:
         return [row[0] for row in rows]
         
 
-db = DatabaseHandler(DB_FILE)
+db = DatabaseHandler(DB_FILE_PATH)
 db.check_integrity()
