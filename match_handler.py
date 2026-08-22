@@ -127,18 +127,31 @@ class MatchHandler:
 
         def add_team_columns(team_label, team_players):
             names_col = "\n".join(
-                f"{self.PLAYER_EMOJIS[p['color']]} {p['name'] or 'Unknown'}"
+                f"{self.PLAYER_EMOJIS.get(p['color'], '')} "
+                f"{p['name'] or 'Unknown'}"
                 for p in team_players
             ) + "\n\u200b"
 
             civ_col = "\n".join(
-                    p["civName"] or "-"
-                    for p in team_players
-                ) + "\n\u200b"
+                p["civName"] or "-"
+                for p in team_players
+            ) + "\n\u200b"
 
-            embed.add_field(name=team_label, value=names_col, inline=True)
-            embed.add_field(name="Civ", value=civ_col, inline=True)
-            embed.add_field(name="\u200b", value="\u200b", inline=True)
+            embed.add_field(
+                name=team_label,
+                value=names_col,
+                inline=True,
+            )
+            embed.add_field(
+                name="Civ",
+                value=civ_col,
+                inline=True,
+            )
+            embed.add_field(
+                name="\u200b",
+                value="\u200b",
+                inline=True,
+            )
 
         # "-" sorts first, then numeric teams in order
         for team_key in sorted(teams, key=lambda t: (0, 0) if t == "-" else (1, t)):
