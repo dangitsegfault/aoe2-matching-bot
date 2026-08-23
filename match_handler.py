@@ -117,11 +117,12 @@ class MatchHandler:
 
 
     def make_match_embedd(self, match_data):
-        embed = discord.Embed(title=match_data['name'])
+        embed = discord.Embed(title=match_data["name"])
         embed.description = f"Map: {match_data['mapName']}"
 
         players = match_data["players"]
         teams = {}
+
         for player in players:
             teams.setdefault(player["team"], []).append(player)
 
@@ -153,9 +154,23 @@ class MatchHandler:
                 inline=True,
             )
 
-        # "-" sorts first, then numeric teams in order
-        for team_key in sorted(teams, key=lambda t: (0, 0) if t == "-" else (1, t)):
-            label = "Team -" if team_key == "-" else f"Team {team_key}"
+        def team_sort_key(team):
+            if team == "-":
+                return (0, 0)
+
+            if team is None:
+                return (0, 1)
+
+            return (1, team)
+
+        for team_key in sorted(teams, key=team_sort_key):
+            if team_key == "-":
+                label = "Team -"
+            elif team_key is None:
+                label = "Team -"
+            else:
+                label = f"Team {team_key}"
+
             add_team_columns(label, teams[team_key])
 
         return embed
