@@ -29,71 +29,67 @@ class MatchHandler:
         }
 
     async def parse_matches_started(self, started_matches):
-        for match in started_matches:
-            match_data = match["data"]
+        for match_data in started_matches:
             match_id = match_data["matchId"]
-            event_type = match["type"]
 
-            match event_type:
-                case "matchAdded":
-                    # Is anyone in this match one of our registered players?
-                    if match_id in self.matches:
-                        # Existing match: update its data but preserve message_id.
-                        self.matches[match_id]["data"] = match_data
-                        continue
+            # Is anyone in this match one of our registered players?
+            if match_id in self.matches:
+                # Existing match: update its data but preserve message_id.
+                self.matches[match_id]["data"] = match_data
+                continue
 
-                    # New match.
-                    # send a message to the server and store its message id
-                    content = self.make_match_content(match_data)
-                    embed = self.make_match_embedd(match_data)
+            # New match.
+            # send a message to the server and store its message id
+            content = self.make_match_content(match_data)
+            embed = self.make_match_embedd(match_data)
 
-                    guild_ids = set()
+            guild_ids = set()
 
-                    for player in match_data["players"]:
-                        player_guilds = db.get_guilds_by_profile_id(
-                            player["profileId"]
-                        )
+            for player in match_data["players"]:
+                player_guilds = db.get_guilds_by_profile_id(
+                    player["profileId"]
+                )
 
-                        for guild_id in player_guilds:
-                            guild_ids.add(guild_id)
+                for guild_id in player_guilds:
+                    guild_ids.add(guild_id)
 
-                    if not guild_ids:
-                        continue
+            if not guild_ids:
+                continue
 
-                    self.matches[match_id] = {
-                        "data": match_data,
-                        "messages": {}
-                    }
+            self.matches[match_id] = {
+                "data": match_data,
+                "messages": {}
+            }
 
-                    for guild_id in guild_ids:
-                        message_id = await bot.send_match_message(
-                            content,
-                            embed,
-                            match_id,
-                            guild_id,
-                        )
-                        self.matches[match_id]["messages"][guild_id] = message_id
+            for guild_id in guild_ids:
+                message_id = await bot.send_match_message(
+                    content,
+                    embed,
+                    match_id,
+                    guild_id,
+                )
+                self.matches[match_id]["messages"][guild_id] = message_id
 
-                case "matchRemoved":
-                    if match_id not in self.matches:
-                        continue
+    async def parse_matches_finished(self, started_matches):
+        for match_data in started_matches:
+            match_id = match_data["matchId"]
 
-                    # update the message on discord to tell the match has ended and delete the match from your lisr
+            if match_id not in self.matches:
+                continue
 
-                    match_data = self.matches[match_id]["data"]
-                    content = self.make_match_ended_message(match_data)
+            # update the message on discord to tell the match has ended and delete the match from your lisr
 
-                    for guild_id, message_id in self.matches[match_id]["messages"].items():
-                        await bot.update_match_message(
-                            message_id,
-                            guild_id,
-                            content,
-                        )
+            match_data = self.matches[match_id]["data"]
+            content = self.make_match_ended_message(match_data)
 
-                    del self.matches[match_id]
+            for guild_id, message_id in self.matches[match_id]["messages"].items():
+                await bot.update_match_message(
+                    message_id,
+                    guild_id,
+                    content,
+                )
 
-                case _:
-                    print ("Unknown event_type: {}" . format (event_type))
+            del self.matches[match_id]
                     
     def has_member(self, match_data):
         return any(
