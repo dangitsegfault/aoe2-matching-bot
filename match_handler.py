@@ -32,7 +32,6 @@ class MatchHandler:
         for match_data in started_matches:
             match_id = match_data["matchId"]
 
-            # Is anyone in this match one of our registered players?
             if match_id in self.matches:
                 # Existing match: update its data but preserve message_id.
                 self.matches[match_id]["data"] = match_data
@@ -40,21 +39,24 @@ class MatchHandler:
 
             # New match.
             # send a message to the server and store its message id
-            content = self.make_match_content(match_data)
-            embed = self.make_match_embedd(match_data)
 
             guild_ids = set()
 
-            for player in match_data["players"]:
-                player_guilds = db.get_guilds_by_profile_id(
-                    player["profileId"]
-                )
+            # Is anyone in this match one of our registered players?
+            for team in match_data.get("teams") or []:
+                for player in team.get("players") or []:
+                    player_guilds = db.get_guilds_by_profile_id(
+                        player["profileId"]
+                    )
 
-                for guild_id in player_guilds:
-                    guild_ids.add(guild_id)
+                    guild_ids.update(player_guilds)
 
             if not guild_ids:
                 continue
+
+            content = self.make_match_content(match_data)
+            embed = self.make_match_embedd(match_data)
+
 
             self.matches[match_id] = {
                 "data": match_data,
@@ -121,17 +123,7 @@ class MatchHandler:
             f"Map: {match_data.get('mapName') or '-'}"
         )
 
-        players = match_data.get("players") or []
-        teams = {}
-
-        for player in players:
-            team = player.get("team")
-
-            # Treat missing team as unassigned.
-            if team is None:
-                team = "-"
-
-            teams.setdefault(team, []).append(player)
+        teams = match_data.get("teams") or []
 
         def add_team_columns(team_label, team_players):
             names_col = "\n".join(
@@ -165,23 +157,16 @@ class MatchHandler:
                 inline=True,
             )
 
-        def team_sort_key(team):
-            if team == "-":
-                return (0, 0)
+        for team in teams:
+            team_id = team.get("teamId")
+            team_players = team.get("players") or []
 
-            # Defensive fallback in case some unexpected type appears.
-            if not isinstance(team, int):
-                return (1, 0)
-
-            return (2, team)
-
-        for team_key in sorted(teams, key=team_sort_key):
-            if team_key == "-":
-                label = "Team -"
+            if not isinstance(team_id, int):
+                team_label = "Team -"
             else:
-                label = f"Team {team_key}"
+                team_label = f"Team {team_id}"
 
-            add_team_columns(label, teams[team_key])
+            add_team_columns(team_label, team_players)
 
         return embed
 
