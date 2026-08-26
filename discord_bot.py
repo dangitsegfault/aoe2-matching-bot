@@ -67,7 +67,7 @@ class DiscordBot(discord.Client):
 
         return message.id
 
-    async def update_match_message(self, message_id, guild_id, content):
+    async def update_match_message(self, message_id, guild_id, content, embed):
         settings = db.get_channel_ids(guild_id)
 
         if settings is None:
@@ -87,6 +87,7 @@ class DiscordBot(discord.Client):
 
         await message.edit(
             content=content,
+            embed=embed,
             view=None,
         )
 
