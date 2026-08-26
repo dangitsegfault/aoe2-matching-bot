@@ -28,8 +28,8 @@ class MatchHandler:
             8: "<:player8:1540294275890417744>",
         }
 
-    async def extract_target_matches(self, ongoing_matches):
-        for match in ongoing_matches:
+    async def parse_matches_started(self, started_matches):
+        for match in started_matches:
             match_data = match["data"]
             match_id = match_data["matchId"]
             event_type = match["type"]

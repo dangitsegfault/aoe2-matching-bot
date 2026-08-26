@@ -3,9 +3,9 @@ import json
 import websockets
 
 class WebSocketHandler:
-    def __init__(self, url, match_handler, socket_size = 10*1024*1024):
+    def __init__(self, url, parser_function, socket_size = 10*1024*1024):
         self.url = url
-        self.match_handler = match_handler
+        self.parser_function = parser_function
         self.running = True
         self.socket_size = socket_size
 
@@ -20,7 +20,7 @@ class WebSocketHandler:
 
                     async for message in websocket:
                         data = json.loads(message)
-                        await self.match_handler.extract_target_matches(data)
+                        await self.parser_function(data)
 
             except (
                 websockets.ConnectionClosed,

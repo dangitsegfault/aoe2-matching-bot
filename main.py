@@ -5,14 +5,17 @@ from match_handler import MatchHandler
 from websocket_handler import WebSocketHandler
 
 BOT_TOKEN = os.environ ["DISCORD_TOKEN"]
-WS_SPECTATE_URL = os.environ.get ("WS_SPECTATE_URL", "ws://127.0.0.1:8765")
+WS_MATCH_STARTED_URL = "wss://socket.aoe2companion.com/listen?handler=ongoing-matches"
+WS_MATCH_FINISHED_URL = "wss://socket.aoe2companion.com/listen?handler=match-finished"
 
-match_handler = MatchHandler ()
-websocket_handler = WebSocketHandler (WS_SPECTATE_URL, match_handler)
+match_started_handler = MatchHandler ()
+match_started_websocket_handler = WebSocketHandler (
+    WS_MATCH_STARTED_URL,
+    match_started_handler.parse_matches_started)
 
 async def main():
     await asyncio.gather(
-        websocket_handler.run(),
+        match_started_websocket_handler.run(),
         bot.start(BOT_TOKEN),
     )
 
