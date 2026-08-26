@@ -117,24 +117,37 @@ class MatchHandler:
 
 
     def make_match_embedd(self, match_data):
-        embed = discord.Embed(title=match_data["name"])
-        embed.description = f"Map: {match_data['mapName']}"
+        embed = discord.Embed(
+            title=match_data.get("name") or "Unknown Match"
+        )
 
-        players = match_data["players"]
+        embed.description = (
+            f"Map: {match_data.get('mapName') or '-'}"
+        )
+
+        players = match_data.get("players") or []
         teams = {}
 
         for player in players:
-            teams.setdefault(player["team"], []).append(player)
+            team = player.get("team")
+
+            # Treat missing team as unassigned.
+            if team is None:
+                team = "-"
+
+            teams.setdefault(team, []).append(player)
 
         def add_team_columns(team_label, team_players):
             names_col = "\n".join(
-                f"{self.PLAYER_EMOJIS.get(p['color'], '')} "
-                f"{p['name'] or 'Unknown'}"
+                (
+                    f"{self.PLAYER_EMOJIS.get(p.get('color'), '')} "
+                    f"{p.get('name') or 'Unknown'}"
+                ).strip()
                 for p in team_players
             ) + "\n\u200b"
 
             civ_col = "\n".join(
-                p["civName"] or "-"
+                p.get("civName") or "-"
                 for p in team_players
             ) + "\n\u200b"
 
@@ -143,11 +156,13 @@ class MatchHandler:
                 value=names_col,
                 inline=True,
             )
+
             embed.add_field(
                 name="Civ",
                 value=civ_col,
                 inline=True,
             )
+
             embed.add_field(
                 name="\u200b",
                 value="\u200b",
@@ -158,15 +173,14 @@ class MatchHandler:
             if team == "-":
                 return (0, 0)
 
-            if team is None:
-                return (0, 1)
+            # Defensive fallback in case some unexpected type appears.
+            if not isinstance(team, int):
+                return (1, 0)
 
-            return (1, team)
+            return (2, team)
 
         for team_key in sorted(teams, key=team_sort_key):
             if team_key == "-":
-                label = "Team -"
-            elif team_key is None:
                 label = "Team -"
             else:
                 label = f"Team {team_key}"
