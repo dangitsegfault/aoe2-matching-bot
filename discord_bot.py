@@ -112,11 +112,13 @@ async def register(
 
     if success:
         await interaction.response.send_message(
-            f"Registered AoE2 profile `{profile_id}`."
+            f"Registered AoE2 profile `{profile_id}`.",
+            ephemeral=True
         )
     else:
         await interaction.response.send_message(
-            "You are already registered, or that AoE2 profile is already registered."
+            "You are already registered, or that AoE2 profile is already registered.",
+            ephemeral=True
         )
 
 @bot.tree.command(
@@ -129,7 +131,8 @@ async def members(interaction: discord.Interaction):
 
     if not members:
         await interaction.response.send_message(
-            "No members are registered."
+            "No members are registered.",
+            ephemeral=True
         )
         return
 
@@ -147,7 +150,9 @@ async def members(interaction: discord.Interaction):
         for profile_id in profile_ids:
             lines.append(f"  └─ `{profile_id}`")
 
-    await interaction.response.send_message("\n".join(lines))
+    await interaction.response.send_message("\n".join(lines),
+                                            ephemeral=True
+                                            )
 
 @bot.tree.command(
     name="unregister",
@@ -166,11 +171,13 @@ async def unregister(
 
     if success:
         await interaction.response.send_message(
-            f"Unregistered AoE2 profile `{profile_id}`."
+            f"Unregistered AoE2 profile `{profile_id}`.",
+            ephemeral=True
         )
     else:
         await interaction.response.send_message(
-            f"Your AoE2 profile `{profile_id}` is not registered."
+            f"Your AoE2 profile `{profile_id}` is not registered.",
+            ephemeral=True
         )
 
 @bot.tree.command(
@@ -195,11 +202,13 @@ async def privileged_register(
 
     if success:
         await interaction.response.send_message(
-            f"Registered AoE2 profile `{profile_id}` for {user.mention}."
+            f"Registered AoE2 profile `{profile_id}` for {user.mention}.",
+            ephemeral=True
         )
     else:
         await interaction.response.send_message(
-            "That AoE2 profile is already registered."
+            "That AoE2 profile is already registered.",
+            ephemeral=True
         )
 
 @bot.tree.command(
@@ -224,11 +233,13 @@ async def privileged_unregister(
 
     if success:
         await interaction.response.send_message(
-            f"Unregistered AoE2 profile `{profile_id}` from {user.mention}."
+            f"Unregistered AoE2 profile `{profile_id}` from {user.mention}.",
+            ephemeral=True
         )
     else:
         await interaction.response.send_message(
-            "That AoE2 profile is not registered to that member."
+            "That AoE2 profile is not registered to that member.",
+            ephemeral=True
         )
 
 @bot.tree.command(
@@ -245,7 +256,8 @@ async def set_spectate_channel(interaction: discord.Interaction):
     bot.spectate_channel = interaction.channel
 
     await interaction.response.send_message(
-        f"Spectate channel set to {interaction.channel.mention}."
+        f"Spectate channel set to {interaction.channel.mention}.",
+        ephemeral=True
     )
 
 @bot.tree.command(
@@ -262,5 +274,6 @@ async def set_lobby_channel(interaction: discord.Interaction):
     bot.lobby_channel = interaction.channel
 
     await interaction.response.send_message(
-        f"Lobby channel set to {interaction.channel.mention}."
+        f"Lobby channel set to {interaction.channel.mention}.",
+        ephemeral=True
     )
