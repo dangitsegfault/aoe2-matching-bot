@@ -2,6 +2,7 @@ import discord
 from discord import app_commands
 from database_handler import db
 import os
+import io
 
 REDIRECT_URL = os.environ ["REDIRECT_URL"]
 DEV_GUILD_ID = os.environ.get("DEV_GUILD_ID")
@@ -43,27 +44,36 @@ class DiscordBot(discord.Client):
 
         return view
 
-    async def send_match_message(self, content, embed, match_id, guild_id):
-        settings = db.get_channel_ids(guild_id)
+    async def send_match_message(self, content, image, match_id, guild_id):
+        print(f"send_match_message called for match {match_id}, guild {guild_id}")
 
+        settings = db.get_channel_ids(guild_id)
         if settings is None:
+            print(f"  no channel settings for guild {guild_id}")
             return None
 
         channel_id = settings["spectate_channel_id"]
-
         if channel_id is None:
+            print(f"  spectate_channel_id not set for guild {guild_id}")
             return None
 
         channel = self.get_channel(channel_id)
-
         if channel is None:
             channel = await self.fetch_channel(channel_id)
+        print(f"  resolved channel: {channel}")
 
-        message = await channel.send(
-            content=content,
-            embed=embed,
-            view=self.make_match_view(match_id),
-        )
+        file = discord.File(io.BytesIO(image.getvalue()), filename=f"match_{match_id}.png")
+
+        try:
+            message = await channel.send(
+                content=content,
+                file=file,
+                view=self.make_match_view(match_id),
+            )
+            print(f"  sent message {message.id}")
+        except discord.HTTPException as e:
+            print(f"  Failed to send match message: {e}")
+            return None
 
         return message.id
 
