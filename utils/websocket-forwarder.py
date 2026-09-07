@@ -10,14 +10,14 @@ import websockets
 CONNECTIONS = [
     {
         "name": "ongoing-matches",
-        "aoe2_url": "wss://socket.aoe2companion.com/listen?handler=ongoing-matches",
-        "local_host": "127.0.0.1",
+        "aoe2_url": "wss://socket.aoe2companion.com/listen?handler=match-started",
+        "local_host": "0.0.0.0",
         "local_port": 8765,
     },
     {
         "name": "lobbies",
-        "aoe2_url": "wss://socket.aoe2companion.com/listen?handler=lobbies",
-        "local_host": "127.0.0.1",
+        "aoe2_url": "wss://socket.aoe2companion.com/listen?handler=match-finished",
+        "local_host": "0.0.0.0",
         "local_port": 8766,
     },
 ]

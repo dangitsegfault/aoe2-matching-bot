@@ -5,8 +5,8 @@ from match_handler import MatchHandler
 from websocket_handler import WebSocketHandler
 
 BOT_TOKEN = os.environ ["DISCORD_TOKEN"]
-WS_MATCH_STARTED_URL = "wss://socket.aoe2companion.com/listen?handler=match-started"
-WS_MATCH_FINISHED_URL = "wss://socket.aoe2companion.com/listen?handler=match-finished"
+WS_MATCH_STARTED_URL = "ws://host.containers.internal:8765" if os.getenv ("TESTING") else "wss://socket.aoe2companion.com/listen?handler=match-started"
+WS_MATCH_FINISHED_URL = "ws://host.containers.internal:8766" if os.getenv ("TESTING") else "wss://socket.aoe2companion.com/listen?handler=match-finished"
 
 match_handler = MatchHandler ()
 match_started_websocket_handler = WebSocketHandler (
