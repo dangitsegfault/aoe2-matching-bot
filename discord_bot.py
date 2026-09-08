@@ -62,7 +62,8 @@ class DiscordBot(discord.Client):
             channel = await self.fetch_channel(channel_id)
         print(f"  resolved channel: {channel}")
 
-        file = discord.File(io.BytesIO(image.getvalue()), filename=f"match_{match_id}.png")
+        filename = f"match_{match_id}.png"
+        file = discord.File(io.BytesIO(image.getvalue()), filename=filename)
 
         try:
             message = await channel.send(

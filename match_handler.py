@@ -44,7 +44,7 @@ class MatchHandler:
         for match_data in started_matches:
             match_id = match_data.get("matchId")
 
-            if match_id == None:
+            if match_id is None:
                 print ("Match id is none")
                 continue
 
@@ -271,67 +271,115 @@ class MatchHandler:
         return int(dt.timestamp())
 
     def make_match_started_image(self, match_data):
-        f_name = ImageFont.truetype(FONT_BOLD, 18)
-        f_meta = ImageFont.truetype(FONT_REG, 16)
-        f_title = ImageFont.truetype(FONT_BOLD, 22)
-
+        supersample_scale = 3
+        
+        title_font = ImageFont.truetype(FONT_BOLD, 18 * supersample_scale)
+        body_font = ImageFont.truetype(FONT_REG, 16 * supersample_scale)
+        team_label_font = ImageFont.truetype(FONT_BOLD, 16 * supersample_scale)
+        
         title = match_data.get("name") or "Unknown Match"
         map_name = match_data.get("mapName") or "-"
         teams = match_data.get("teams") or []
-
-        width = 620
-        row_h = 52
-        row_gap = 8
-        pad = 20
-        header_h = 60
-        team_gap = 16
-
-        total_rows = sum(len(t.get("players") or []) for t in teams)
-        height = pad * 2 + header_h + len(teams) * (24 + team_gap) + total_rows * (row_h + row_gap)
-
-        img = Image.new("RGB", (width, int(height)), "#1E1F22")
-        draw = ImageDraw.Draw(img)
-
-        # Header
-        draw.text((pad, pad), title, font=f_title, fill="#FFFFFF")
-        draw.text((pad, pad + 28), f"Map: {map_name}", font=f_meta, fill="#949BA4")
-
-        y = pad + header_h
+        
+        image_width = 620
+        player_row_height = 52
+        player_row_gap = 8
+        outer_padding = 20
+        header_height = 60
+        team_section_gap = 16
+        team_label_height = 24
+        
+        total_player_rows = sum(len(team.get("players") or []) for team in teams)
+        image_height = (
+            outer_padding * 2
+            + header_height
+            + len(teams) * (team_label_height + team_section_gap)
+            + total_player_rows * (player_row_height + player_row_gap)
+        )
+        
+        scaled_width = image_width * supersample_scale
+        scaled_row_height = player_row_height * supersample_scale
+        scaled_row_gap = player_row_gap * supersample_scale
+        scaled_padding = outer_padding * supersample_scale
+        scaled_header_height = header_height * supersample_scale
+        scaled_team_section_gap = team_section_gap * supersample_scale
+        scaled_team_label_height = team_label_height * supersample_scale
+        scaled_height = int(image_height * supersample_scale)
+        
+        image = Image.new("RGB", (scaled_width, scaled_height), "#1E1F22")
+        draw = ImageDraw.Draw(image)
+        
+        draw.text((scaled_padding, scaled_padding), title, font=title_font, fill="#FFFFFF")
+        draw.text(
+            (scaled_padding, scaled_padding + 28 * supersample_scale),
+            f"Map: {map_name}",
+            font=body_font,
+            fill="#949BA4",
+        )
+        
+        cursor_y = scaled_padding + scaled_header_height
         for team in teams:
             team_id = team.get("teamId")
             team_label = f"Team {team_id}" if isinstance(team_id, int) else "Team -"
-            draw.text((pad, y), team_label, font=ImageFont.truetype(FONT_BOLD, 16), fill="#B5BAC1")
-            y += 24
-
-            for p in team.get("players") or []:
-                color = self.PLAYER_COLORS.get(p.get("color"), "#72767D")
-                name = p.get("name") or "Unknown"
-                civ = p.get("civName") or "-"
-                rating = str(p.get("rating") or "-")
-
-                # Row card
+            draw.text((scaled_padding, cursor_y), team_label, font=team_label_font, fill="#B5BAC1")
+            cursor_y += scaled_team_label_height
+            
+            for player in team.get("players") or []:
+                accent_color = self.PLAYER_COLORS.get(player.get("color"), "#72767D")
+                player_name = player.get("name") or "Unknown"
+                civ_name = player.get("civName") or "-"
+                player_rating = str(player.get("rating") or "-")
+                
                 draw.rounded_rectangle(
-                    [pad, y, width - pad, y + row_h], radius=10, fill="#2B2D31"
+                    [scaled_padding, cursor_y, scaled_width - scaled_padding, cursor_y + scaled_row_height],
+                    radius=10 * supersample_scale,
+                    fill="#2B2D31",
                 )
-                # Left color accent bar
                 draw.rounded_rectangle(
-                    [pad, y, pad + 5, y + row_h], radius=3, fill=color
+                    [scaled_padding, cursor_y, scaled_padding + 5 * supersample_scale, cursor_y + scaled_row_height],
+                    radius=3 * supersample_scale,
+                    fill=accent_color,
                 )
-                # Civ badge (text pill — swap for a real icon image if you have civ art assets)
+                
+                civ_text_width = draw.textlength(civ_name, font=body_font)
+                civ_badge_padding_x = 10 * supersample_scale
+                civ_badge_width = civ_text_width + civ_badge_padding_x * 2
+                civ_badge_left = scaled_padding + 16 * supersample_scale
+                civ_badge_right = civ_badge_left + civ_badge_width
                 draw.rounded_rectangle(
-                    [pad + 16, y + 12, pad + 16 + 90, y + row_h - 12], radius=6, fill="#3A3C41"
+                    [
+                        civ_badge_left,
+                        cursor_y + 12 * supersample_scale,
+                        civ_badge_right,
+                        cursor_y + scaled_row_height - 12 * supersample_scale,
+                    ],
+                    radius=6 * supersample_scale,
+                    fill="#3A3C41",
                 )
-                draw.text((pad + 26, y + 17), civ, font=f_meta, fill="#DBDEE1")
-                # Name
-                draw.text((pad + 120, y + 16), name, font=f_name, fill="#FFFFFF")
-                # Rating, right-aligned
-                rw = draw.textlength(rating, font=f_name)
-                draw.text((width - pad - 20 - rw, y + 16), rating, font=f_name, fill="#DBDEE1")
-
-                y += row_h + row_gap
-            y += team_gap - row_gap
-
-        buf = io.BytesIO()
-        img.save(buf, "PNG")
-        buf.seek(0)
-        return buf
+                draw.text(
+                    (civ_badge_left + civ_badge_padding_x, cursor_y + 17 * supersample_scale),
+                    civ_name,
+                    font=body_font,
+                    fill="#DBDEE1",
+                )
+                
+                player_name_x = civ_badge_right + 16 * supersample_scale
+                draw.text((player_name_x, cursor_y + 16 * supersample_scale), player_name, font=body_font, fill="#FFFFFF")
+                
+                rating_width = draw.textlength(player_rating, font=body_font)
+                draw.text(
+                    (scaled_width - scaled_padding - 20 * supersample_scale - rating_width, cursor_y + 16 * supersample_scale),
+                    player_rating,
+                    font=body_font,
+                    fill="#DBDEE1",
+                )
+                
+                cursor_y += scaled_row_height + scaled_row_gap
+                cursor_y += scaled_team_section_gap - scaled_row_gap
+                
+        buffer = io.BytesIO()
+        image = image.resize((image_width, int(image_height)), Image.LANCZOS)
+        image.save(buffer, "PNG")
+        buffer.seek(0)
+        return buffer
+    
