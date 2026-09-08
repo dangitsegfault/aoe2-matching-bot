@@ -290,13 +290,30 @@ class MatchHandler:
         map_name = match_data.get("mapName") or "-"
         teams = match_data.get("teams") or []
 
+        meta_lines = [
+            f"Leaderboard: {match_data.get('leaderboardName') or '-'}",
+            f"Game Mode: {match_data.get('gameModeName') or '-'}",
+            f"Map: {map_name}",
+            f"Map Size: {match_data.get('mapSizeName') or '-'}",
+            f"Server: {match_data.get('server') or '-'}",
+        ]
+
         image_width = 620
 
         player_row_height = 52
         player_row_gap = 8
 
         outer_padding = 20
-        header_height = 60
+
+        title_to_meta_gap = 28
+        meta_line_height = 22
+        header_bottom_buffer = 32
+        header_height = (
+            title_to_meta_gap
+            + (len(meta_lines) - 1) * meta_line_height
+            + header_bottom_buffer
+        )
+
         team_section_gap = 16
         team_label_height = 24
 
@@ -324,6 +341,24 @@ class MatchHandler:
             bbox = draw.textbbox((0, 0), text, font=font)
             text_height = bbox[3] - bbox[1]
             return cursor_y + (row_height - text_height) // 2 - bbox[1]
+
+        def draw_header(scaled_padding):
+            draw.text(
+                (scaled_padding, scaled_padding),
+                title,
+                font=title_font,
+                fill="#FFFFFF",
+            )
+
+            line_y = scaled_padding + title_to_meta_gap * supersample_scale
+            for line in meta_lines:
+                draw.text(
+                    (scaled_padding, line_y),
+                    line,
+                    font=body_font,
+                    fill="#949BA4",
+                )
+                line_y += meta_line_height * supersample_scale
 
         # ------------------------------------------------------------
         # Two-team layout
@@ -379,27 +414,7 @@ class MatchHandler:
 
             draw = ImageDraw.Draw(image)
 
-            # Header
-            draw.text(
-                (
-                    scaled_padding,
-                    scaled_padding,
-                ),
-                title,
-                font=title_font,
-                fill="#FFFFFF",
-            )
-
-            draw.text(
-                (
-                    scaled_padding,
-                    scaled_padding
-                    + 28 * supersample_scale,
-                ),
-                f"Map: {map_name}",
-                font=body_font,
-                fill="#949BA4",
-            )
+            draw_header(scaled_padding)
 
             left_x = scaled_padding
 
@@ -498,7 +513,7 @@ class MatchHandler:
 
                     # Civilization icon
                     civ_icon_size = 40 * supersample_scale
-                    icon_gap = 10 * supersample_scale  # space between accent bar and icon
+                    icon_gap = 10 * supersample_scale
 
                     icon_x = x + 5 * supersample_scale + icon_gap
                     icon_y = cursor_y + (scaled_row_height - civ_icon_size) // 2
@@ -650,27 +665,7 @@ class MatchHandler:
 
             draw = ImageDraw.Draw(image)
 
-            # Header
-            draw.text(
-                (
-                    scaled_padding,
-                    scaled_padding,
-                ),
-                title,
-                font=title_font,
-                fill="#FFFFFF",
-            )
-
-            draw.text(
-                (
-                    scaled_padding,
-                    scaled_padding
-                    + 28 * supersample_scale,
-                ),
-                f"Map: {map_name}",
-                font=body_font,
-                fill="#949BA4",
-            )
+            draw_header(scaled_padding)
 
             cursor_y = (
                 scaled_padding
