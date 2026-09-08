@@ -279,11 +279,11 @@ class MatchHandler:
         body_font = ImageFont.truetype(
             FONT_REG, 16 * supersample_scale
         )
-        team_label_font = ImageFont.truetype(
-            FONT_BOLD, 16 * supersample_scale
-        )
         vs_font = ImageFont.truetype(
             FONT_BOLD, 20 * supersample_scale
+        )
+        team_label_font = ImageFont.truetype(
+            FONT_BOLD, 16 * supersample_scale
         )
 
         title = match_data.get("name") or "Unknown Match"
@@ -291,12 +291,39 @@ class MatchHandler:
         teams = match_data.get("teams") or []
 
         image_width = 620
+
         player_row_height = 52
         player_row_gap = 8
+
         outer_padding = 20
         header_height = 60
         team_section_gap = 16
         team_label_height = 24
+
+        def load_civ_icon(civ):
+            if not civ:
+                return None
+
+            path = os.path.join(
+                BASE_DIR,
+                "assets",
+                "icons",
+                "civs",
+                f"{civ}.png",
+            )
+
+            if not os.path.exists(path):
+                return None
+
+            return Image.open(path).convert("RGBA")
+
+        def centered_text_y(cursor_y, row_height, text, font):
+            """Vertically center text within a row, correcting for the
+            font's ascender offset so the glyph ink is centered, not
+            just its bounding box."""
+            bbox = draw.textbbox((0, 0), text, font=font)
+            text_height = bbox[3] - bbox[1]
+            return cursor_y + (row_height - text_height) // 2 - bbox[1]
 
         # ------------------------------------------------------------
         # Two-team layout
@@ -304,6 +331,7 @@ class MatchHandler:
         if len(teams) == 2:
             column_gap = 50
             vs_width = 30
+
             column_width = (
                 image_width
                 - outer_padding * 2
@@ -319,27 +347,44 @@ class MatchHandler:
             image_height = (
                 outer_padding * 2
                 + header_height
-                + total_player_rows * (player_row_height + player_row_gap)
+                + total_player_rows
+                * (player_row_height + player_row_gap)
+                - player_row_gap
             )
 
             scaled_width = image_width * supersample_scale
-            scaled_height = int(image_height * supersample_scale)
+            scaled_height = image_height * supersample_scale
 
-            scaled_padding = outer_padding * supersample_scale
-            scaled_header_height = header_height * supersample_scale
-            scaled_row_height = player_row_height * supersample_scale
-            scaled_row_gap = player_row_gap * supersample_scale
+            scaled_padding = (
+                outer_padding * supersample_scale
+            )
+            scaled_header_height = (
+                header_height * supersample_scale
+            )
+            scaled_row_height = (
+                player_row_height * supersample_scale
+            )
+            scaled_row_gap = (
+                player_row_gap * supersample_scale
+            )
+            scaled_column_width = (
+                column_width * supersample_scale
+            )
 
             image = Image.new(
                 "RGB",
                 (scaled_width, scaled_height),
                 "#1E1F22",
             )
+
             draw = ImageDraw.Draw(image)
 
             # Header
             draw.text(
-                (scaled_padding, scaled_padding),
+                (
+                    scaled_padding,
+                    scaled_padding,
+                ),
                 title,
                 font=title_font,
                 fill="#FFFFFF",
@@ -348,17 +393,13 @@ class MatchHandler:
             draw.text(
                 (
                     scaled_padding,
-                    scaled_padding + 28 * supersample_scale,
+                    scaled_padding
+                    + 28 * supersample_scale,
                 ),
                 f"Map: {map_name}",
                 font=body_font,
                 fill="#949BA4",
             )
-
-            # Column positions
-            scaled_column_width = column_width * supersample_scale
-            scaled_column_gap = column_gap * supersample_scale
-            scaled_vs_width = vs_width * supersample_scale
 
             left_x = scaled_padding
 
@@ -368,20 +409,48 @@ class MatchHandler:
                 - scaled_column_width
             )
 
-            # Center VS between columns
+            start_y = (
+                scaled_padding
+                + scaled_header_height
+            )
+
+            # VS
             vs_text = "VS"
+
             vs_bbox = draw.textbbox(
                 (0, 0),
                 vs_text,
                 font=vs_font,
             )
-            vs_text_width = vs_bbox[2] - vs_bbox[0]
-            vs_x = (
-                (scaled_width - vs_text_width) // 2
+
+            vs_text_width = (
+                vs_bbox[2] - vs_bbox[0]
+            )
+            vs_text_height = (
+                vs_bbox[3] - vs_bbox[1]
             )
 
-            # Start below header
-            start_y = scaled_padding + scaled_header_height
+            vs_x = (
+                scaled_width - vs_text_width
+            ) // 2
+
+            vs_y = (
+                start_y
+                + (
+                    total_player_rows
+                    * (scaled_row_height + scaled_row_gap)
+                    - scaled_row_gap
+                ) // 2
+                - vs_text_height // 2
+                - vs_bbox[1]
+            )
+
+            draw.text(
+                (vs_x, vs_y),
+                vs_text,
+                font=vs_font,
+                fill="#B5BAC1",
+            )
 
             def draw_player_column(players, x):
                 cursor_y = start_y
@@ -392,11 +461,16 @@ class MatchHandler:
                         "#72767D",
                     )
 
-                    player_name = player.get("name") or "Unknown"
-                    civ_name = player.get("civName") or "-"
+                    player_name = (
+                        player.get("name") or "Unknown"
+                    )
+
                     player_rating = str(
                         player.get("rating") or "-"
                     )
+
+                    civ = player.get("civ")
+                    civ_icon = load_civ_icon(civ)
 
                     # Player card
                     draw.rounded_rectangle(
@@ -422,83 +496,60 @@ class MatchHandler:
                         fill=accent_color,
                     )
 
-                    # Civilization badge
-                    civ_text_width = draw.textlength(
-                        civ_name,
-                        font=body_font,
-                    )
+                    # Civilization icon
+                    civ_icon_size = 40 * supersample_scale
+                    icon_gap = 10 * supersample_scale  # space between accent bar and icon
 
-                    civ_badge_padding_x = 10 * supersample_scale
-                    civ_badge_width = (
-                        civ_text_width
-                        + civ_badge_padding_x * 2
-                    )
+                    icon_x = x + 5 * supersample_scale + icon_gap
+                    icon_y = cursor_y + (scaled_row_height - civ_icon_size) // 2
 
-                    civ_badge_left = (
-                        x + 16 * supersample_scale
-                    )
-                    civ_badge_right = (
-                        civ_badge_left + civ_badge_width
-                    )
+                    if civ_icon:
+                        civ_icon = civ_icon.resize(
+                            (civ_icon_size, civ_icon_size),
+                            Image.LANCZOS,
+                        )
 
-                    draw.rounded_rectangle(
-                        [
-                            civ_badge_left,
-                            cursor_y + 12 * supersample_scale,
-                            civ_badge_right,
-                            cursor_y + scaled_row_height
-                            - 12 * supersample_scale,
-                        ],
-                        radius=6 * supersample_scale,
-                        fill="#3A3C41",
-                    )
-
-                    draw.text(
-                        (
-                            civ_badge_left
-                            + civ_badge_padding_x,
-                            cursor_y
-                            + 17 * supersample_scale,
-                        ),
-                        civ_name,
-                        font=body_font,
-                        fill="#DBDEE1",
-                    )
+                        image.paste(
+                            civ_icon,
+                            (icon_x, icon_y),
+                            civ_icon,
+                        )
 
                     # Player name
-                    player_name_x = (
-                        civ_badge_right
-                        + 12 * supersample_scale
+                    player_name_x = icon_x + civ_icon_size + 12 * supersample_scale
+
+                    rating_width = draw.textlength(
+                        player_rating,
+                        font=body_font,
                     )
 
-                    # Make sure the name doesn't overlap rating
                     max_name_width = (
                         x
                         + scaled_column_width
                         - 16 * supersample_scale
-                        - draw.textlength(
-                            player_rating,
-                            font=body_font,
-                        )
+                        - rating_width
                         - player_name_x
                     )
 
-                    # Keep the normal name if it fits.
-                    # Otherwise truncate it.
                     name = player_name
 
                     while (
-                        draw.textlength(name, font=body_font)
-                        > max_name_width
+                        draw.textlength(
+                            name,
+                            font=body_font,
+                        ) > max_name_width
                         and len(name) > 1
                     ):
                         name = name[:-2] + "…"
 
+                    name_y = centered_text_y(
+                        cursor_y, scaled_row_height, name, body_font
+                    )
+
                     draw.text(
                         (
                             player_name_x,
-                            cursor_y
-                            + 16 * supersample_scale,
+                            name_y,
                         ),
                         name,
                         font=body_font,
@@ -506,19 +557,21 @@ class MatchHandler:
                     )
 
                     # Rating
-                    rating_width = draw.textlength(
-                        player_rating,
-                        font=body_font,
+                    rating_x = (
+                        x
+                        + scaled_column_width
+                        - 16 * supersample_scale
+                        - rating_width
+                    )
+
+                    rating_y = centered_text_y(
+                        cursor_y, scaled_row_height, player_rating, body_font
                     )
 
                     draw.text(
                         (
-                            x
-                            + scaled_column_width
-                            - 16 * supersample_scale
-                            - rating_width,
-                            cursor_y
-                            + 16 * supersample_scale,
+                            rating_x,
+                            rating_y,
                         ),
                         player_rating,
                         font=body_font,
@@ -540,32 +593,6 @@ class MatchHandler:
                 right_x,
             )
 
-            # VS
-            vs_bbox = draw.textbbox(
-                (vs_x, start_y),
-                vs_text,
-                font=vs_font,
-            )
-
-            vs_y = (
-                start_y
-                + (
-                    max(
-                        len(teams[0].get("players") or []),
-                        len(teams[1].get("players") or []),
-                    )
-                    * (scaled_row_height + scaled_row_gap)
-                ) // 2
-                - (vs_bbox[3] - vs_bbox[1]) // 2
-            )
-
-            draw.text(
-                (vs_x, vs_y),
-                vs_text,
-                font=vs_font,
-                fill="#B5BAC1",
-            )
-
         # ------------------------------------------------------------
         # Three or more teams: vertical layout
         # ------------------------------------------------------------
@@ -582,29 +609,37 @@ class MatchHandler:
                 * (team_label_height + team_section_gap)
                 + total_player_rows
                 * (player_row_height + player_row_gap)
+                - (
+                    player_row_gap
+                    if total_player_rows
+                    else 0
+                )
             )
 
-            scaled_width = image_width * supersample_scale
-            scaled_row_height = (
-                player_row_height * supersample_scale
+            scaled_width = (
+                image_width * supersample_scale
             )
-            scaled_row_gap = (
-                player_row_gap * supersample_scale
+            scaled_height = (
+                image_height * supersample_scale
             )
+
             scaled_padding = (
                 outer_padding * supersample_scale
             )
             scaled_header_height = (
                 header_height * supersample_scale
             )
+            scaled_row_height = (
+                player_row_height * supersample_scale
+            )
+            scaled_row_gap = (
+                player_row_gap * supersample_scale
+            )
             scaled_team_section_gap = (
                 team_section_gap * supersample_scale
             )
             scaled_team_label_height = (
                 team_label_height * supersample_scale
-            )
-            scaled_height = int(
-                image_height * supersample_scale
             )
 
             image = Image.new(
@@ -615,8 +650,12 @@ class MatchHandler:
 
             draw = ImageDraw.Draw(image)
 
+            # Header
             draw.text(
-                (scaled_padding, scaled_padding),
+                (
+                    scaled_padding,
+                    scaled_padding,
+                ),
                 title,
                 font=title_font,
                 fill="#FFFFFF",
@@ -648,7 +687,10 @@ class MatchHandler:
                 )
 
                 draw.text(
-                    (scaled_padding, cursor_y),
+                    (
+                        scaled_padding,
+                        cursor_y,
+                    ),
                     team_label,
                     font=team_label_font,
                     fill="#B5BAC1",
@@ -665,13 +707,15 @@ class MatchHandler:
                     player_name = (
                         player.get("name") or "Unknown"
                     )
-                    civ_name = (
-                        player.get("civName") or "-"
-                    )
+
                     player_rating = str(
                         player.get("rating") or "-"
                     )
 
+                    civ = player.get("civ")
+                    civ_icon = load_civ_icon(civ)
+
+                    # Player card
                     draw.rounded_rectangle(
                         [
                             scaled_padding,
@@ -683,6 +727,7 @@ class MatchHandler:
                         fill="#2B2D31",
                     )
 
+                    # Player color accent
                     draw.rounded_rectangle(
                         [
                             scaled_padding,
@@ -695,85 +740,82 @@ class MatchHandler:
                         fill=accent_color,
                     )
 
-                    civ_text_width = draw.textlength(
-                        civ_name,
-                        font=body_font,
-                    )
+                    # Civilization icon
+                    civ_icon_size = 40 * supersample_scale
+                    icon_gap = 10 * supersample_scale
 
-                    civ_badge_padding_x = (
-                        10 * supersample_scale
-                    )
+                    icon_x = scaled_padding + 5 * supersample_scale + icon_gap
+                    icon_y = cursor_y + (scaled_row_height - civ_icon_size) // 2
 
-                    civ_badge_width = (
-                        civ_text_width
-                        + civ_badge_padding_x * 2
-                    )
+                    if civ_icon:
+                        civ_icon = civ_icon.resize(
+                            (civ_icon_size, civ_icon_size),
+                            Image.LANCZOS,
+                        )
 
-                    civ_badge_left = (
-                        scaled_padding
-                        + 16 * supersample_scale
-                    )
+                        image.paste(
+                            civ_icon,
+                            (icon_x, icon_y),
+                            civ_icon,
+                        )
 
-                    civ_badge_right = (
-                        civ_badge_left
-                        + civ_badge_width
-                    )
-
-                    draw.rounded_rectangle(
-                        [
-                            civ_badge_left,
-                            cursor_y
-                            + 12 * supersample_scale,
-                            civ_badge_right,
-                            cursor_y
-                            + scaled_row_height
-                            - 12 * supersample_scale,
-                        ],
-                        radius=6 * supersample_scale,
-                        fill="#3A3C41",
-                    )
-
-                    draw.text(
-                        (
-                            civ_badge_left
-                            + civ_badge_padding_x,
-                            cursor_y
-                            + 17 * supersample_scale,
-                        ),
-                        civ_name,
-                        font=body_font,
-                        fill="#DBDEE1",
-                    )
-
-                    player_name_x = (
-                        civ_badge_right
-                        + 16 * supersample_scale
-                    )
-
-                    draw.text(
-                        (
-                            player_name_x,
-                            cursor_y
-                            + 16 * supersample_scale,
-                        ),
-                        player_name,
-                        font=body_font,
-                        fill="#FFFFFF",
-                    )
+                    # Player name
+                    player_name_x = icon_x + civ_icon_size + 16 * supersample_scale
 
                     rating_width = draw.textlength(
                         player_rating,
                         font=body_font,
                     )
 
+                    max_name_width = (
+                        scaled_width
+                        - scaled_padding
+                        - 20 * supersample_scale
+                        - rating_width
+                        - player_name_x
+                    )
+
+                    name = player_name
+
+                    while (
+                        draw.textlength(
+                            name,
+                            font=body_font,
+                        ) > max_name_width
+                        and len(name) > 1
+                    ):
+                        name = name[:-2] + "…"
+
+                    name_y = centered_text_y(
+                        cursor_y, scaled_row_height, name, body_font
+                    )
+
                     draw.text(
                         (
-                            scaled_width
-                            - scaled_padding
-                            - 20 * supersample_scale
-                            - rating_width,
-                            cursor_y
-                            + 16 * supersample_scale,
+                            player_name_x,
+                            name_y,
+                        ),
+                        name,
+                        font=body_font,
+                        fill="#FFFFFF",
+                    )
+
+                    # Rating
+                    rating_x = (
+                        scaled_width
+                        - scaled_padding
+                        - 20 * supersample_scale
+                        - rating_width
+                    )
+
+                    rating_y = centered_text_y(
+                        cursor_y, scaled_row_height, player_rating, body_font
+                    )
+
+                    draw.text(
+                        (
+                            rating_x,
+                            rating_y,
                         ),
                         player_rating,
                         font=body_font,
@@ -785,15 +827,18 @@ class MatchHandler:
                         + scaled_row_gap
                     )
 
-                    cursor_y += (
-                        scaled_team_section_gap
-                        - scaled_row_gap
-                    )
+                cursor_y += scaled_team_section_gap
 
+        # ------------------------------------------------------------
+        # Downsample and return
+        # ------------------------------------------------------------
         buffer = io.BytesIO()
 
         image = image.resize(
-            (image_width, int(image_height)),
+            (
+                image_width,
+                image_height,
+            ),
             Image.LANCZOS,
         )
 
