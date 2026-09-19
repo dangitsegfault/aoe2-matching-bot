@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from PIL import Image, ImageDraw, ImageFont
 
+from datetime import datetime
+
 import os
 import io
 
@@ -30,6 +32,23 @@ f_reg_16 = ImageFont.truetype(FONT_REG, 16 * supersample_scale)
 f_bold_16 = ImageFont.truetype(FONT_BOLD, 16 * supersample_scale)
 
 team_width = 280
+
+def calculate_match_duration (start_time, finish_time):
+    if start_time is None or finish_time is None:
+        return "0h 0m"
+    
+    started = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+    finished = datetime.fromisoformat(finish_time.replace("Z", "+00:00"))
+
+    duration = finished - started
+
+    hours, remainder = divmod(int(duration.total_seconds()), 3600)
+    minutes = remainder // 60
+
+    if hours:
+        return f"{hours}h {minutes}m"
+    else:
+        return f"{minutes}m"
 
 def load_civ_icon(civ):
     if not civ:
@@ -163,7 +182,7 @@ def create_match_meta(match_data):
             f_reg_16,
         ),
         (
-            f"{match_data.get('server') or '-'}",
+            f"{match_data.get('server') or calculate_match_duration(match_data.get('started'), match_data.get('finished'))}",
             f_reg_16,
         ),
     ]
