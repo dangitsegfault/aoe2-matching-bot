@@ -32,13 +32,46 @@ class DiscordBot(discord.Client):
     async def on_ready(self):
         print(f"Logged in as {self.user}")
 
-    def make_match_view(self, match_id):
+    def make_match_started_view(self, match_id):
         view = discord.ui.View()
 
         view.add_item(
             discord.ui.Button(
                 label="Spectate",
                 url=f"{REDIRECT_URL}/spectate/{match_id}",
+            )
+        )
+
+        view.add_item(
+            discord.ui.Button(
+                label="AoE2 Companion",
+                url=f"https://www.aoe2companion.com/matches/{match_id}",
+            )
+        )
+
+        view.add_item(
+            discord.ui.Button(
+                label="AoE2 Insights",
+                url=f"https://www.aoe2insights.com/match/{match_id}",
+            )
+        )
+
+        return view
+
+    def make_match_finished_view(self, match_id):
+        view = discord.ui.View()
+
+        view.add_item(
+            discord.ui.Button(
+                label="AoE2 Companion",
+                url=f"https://www.aoe2companion.com/matches/{match_id}",
+            )
+        )
+
+        view.add_item(
+            discord.ui.Button(
+                label="AoE2 Insights",
+                url=f"https://www.aoe2insights.com/match/{match_id}",
             )
         )
 
@@ -69,7 +102,7 @@ class DiscordBot(discord.Client):
             message = await channel.send(
                 content=content,
                 file=file,
-                view=self.make_match_view(match_id),
+                view=self.make_match_started_view(match_id),
             )
             print(f"  sent message {message.id}")
         except discord.HTTPException as e:
@@ -107,7 +140,7 @@ class DiscordBot(discord.Client):
             message = await message.edit(
                 content=content,
                 attachments=[file],
-                view=None,
+                view=self.make_match_finished_view(match_id),
             )
             print(f"  sent updated {message.id}")
         except discord.HTTPException as e:
