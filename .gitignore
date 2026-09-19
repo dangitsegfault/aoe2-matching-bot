@@ -1,0 +1,12 @@
+# Emacs
+*~
+\#*\#
+.#*
+/.dir-locals.el
+/.emacs.desktop
+/.emacs.desktop.lock
+/tramp
+/auto-save-list/
+/elpa/
+/eshell/
+/projectile-bookmarks.eld
