@@ -2,869 +2,431 @@ from __future__ import annotations
 
 from PIL import Image, ImageDraw, ImageFont
 
+import os
+import io
 
-Size = int | float | str | None
-BorderWidth = int | tuple[int, int, int, int]
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FONT_REG = os.path.join(BASE_DIR, "assets", "fonts", "Inter_18pt-Regular.ttf")
+FONT_BOLD = os.path.join(BASE_DIR, "assets", "fonts", "Inter_18pt-Bold.ttf")
 
+PLAYER_COLORS = {
+    1: "#4A6FE3", 2: "#E34A4A", 3: "#4AE36F", 4: "#E3D14A",
+    5: "#4AD1E3", 6: "#E34AC9", 7: "#9A9A9A", 8: "#E38A4A",
+}
 
-def resolve_size(
-    value: Size,
-    parent_size: int | None,
-) -> int | None:
-    """
-    Resolve a size specification.
+IMAGE_COLORS = {
+    "background": (30, 31, 34, 255),
+    "card_background": (43, 45, 49, 255),
+    "secondary_text": (148, 155, 164, 255),
+    "primary_text": (255, 255, 255, 255),
+    "rating_text": (219, 222, 225, 255),
+    "vs_text_color": (181, 186, 193, 255),
+}
 
-    Examples:
-        200      -> 200 pixels
-        "50%"    -> 50% of parent_size
-        None     -> auto/intrinsic size
-    """
-    if value is None:
+supersample_scale = 3
+
+f_bold_18 = ImageFont.truetype(FONT_BOLD, 18 * supersample_scale)
+f_reg_16 = ImageFont.truetype(FONT_REG, 16 * supersample_scale)
+f_bold_16 = ImageFont.truetype(FONT_BOLD, 16 * supersample_scale)
+
+team_width = 280
+
+def load_civ_icon(civ):
+    if not civ:
         return None
 
-    if isinstance(value, str):
-        if not value.endswith("%"):
-            raise ValueError(
-                f"Invalid size {value!r}. "
-                "Expected a number or percentage such as '50%'."
+    path = os.path.join(
+        BASE_DIR,
+        "assets",
+        "icons",
+        "civs",
+        f"{civ}.png",
+    )
+
+    if not os.path.exists(path):
+        fallback_path = os.path.join(
+            BASE_DIR,
+            "assets",
+            "icons",
+            "civs",
+            "unknown.png",
             )
 
-        if parent_size is None:
-            raise ValueError(
-                f"Cannot resolve percentage size {value!r} "
-                "without a parent size."
+        if not os.path.exists(fallback_path):
+            return None
+
+        return Image.open(fallback_path).convert("RGBA")
+
+    return Image.open(path).convert("RGBA")
+
+def load_map_icon(target_map):
+    if not target_map:
+        return None
+
+    path = os.path.join(
+        BASE_DIR,
+        "assets",
+        "icons",
+        "maps",
+        f"{target_map}.png",
+    )
+
+    if not os.path.exists(path):
+        fallback_path = os.path.join(
+            BASE_DIR,
+            "assets",
+            "icons",
+            "maps",
+            "Unknown.png",
             )
 
-        try:
-            percentage = float(value[:-1])
-        except ValueError:
-            raise ValueError(
-                f"Invalid percentage size: {value!r}"
-            )
+        if not os.path.exists(fallback_path):
+            return None
 
-        return round(parent_size * percentage / 100)
+        return Image.open(fallback_path).convert("RGBA")
 
-    return round(value)
+    return Image.open(path).convert("RGBA")
 
+def center_to_topleft(center_x, center_y, image_to_center):
+    """Return the top-left coordinates needed to center an image at the given coordinates."""
+    return (
+        center_x - image_to_center.width // 2,
+        center_y - image_to_center.height // 2,
+    )
 
-class Node:
-    def __init__(
-        self,
-        *,
-        width: Size = None,
-        height: Size = None,
-        align_self: str | None = None,
-    ):
-        self.parent: Container | None = None
+def merge_images(img1, img2, direction="vertical", padding=0):
+    if direction == "horizontal":
+        width = img1.width + padding + img2.width
+        height = max(img1.height, img2.height)
 
-        # Requested size.
-        self.width = width
-        self.height = height
-
-        # Resolved layout geometry.
-        self.x = 0
-        self.y = 0
-        self.actual_width = 0
-        self.actual_height = 0
-
-        self.align_self = align_self
-
-    def measure(
-        self,
-        parent_width: int | None = None,
-        parent_height: int | None = None,
-    ) -> tuple[int, int]:
-        raise NotImplementedError
-
-    def layout(
-        self,
-        parent_width: int | None = None,
-        parent_height: int | None = None,
-    ) -> None:
-        measured_width, measured_height = self.measure(
-            parent_width,
-            parent_height,
-        )
-
-        width = resolve_size(
-            self.width,
-            parent_width,
-        )
-
-        height = resolve_size(
-            self.height,
-            parent_height,
-        )
-
-        self.actual_width = (
-            width if width is not None else measured_width
-        )
-
-        self.actual_height = (
-            height if height is not None else measured_height
-        )
-
-    def draw(self, canvas: Image.Image) -> None:
-        raise NotImplementedError
-
-
-class Container(Node):
-    def __init__(
-        self,
-        *,
-        width: Size = None,
-        height: Size = None,
-        children: list[Node] | None = None,
-        direction: str = "column",
-        justify: str = "start",
-        align: str = "start",
-        gap: int = 0,
-        padding: int = 0,
-        background=None,
-        border_width: BorderWidth = 0,
-        border_color=(0, 0, 0, 255),
-        border_sides: set[str] | None = None,
-    ):
-        super().__init__(
-            width=width,
-            height=height,
-        )
-
-        if direction not in ("row", "column"):
-            raise ValueError(
-                "direction must be 'row' or 'column'"
-            )
-
-        if justify not in (
-            "start",
-            "center",
-            "end",
-            "space_between",
-            "space_around",
-        ):
-            raise ValueError(
-                "invalid justify value"
-            )
-
-        if align not in (
-            "start",
-            "center",
-            "end",
-        ):
-            raise ValueError(
-                "align must be 'start', 'center', or 'end'"
-            )
-
-        if gap < 0:
-            raise ValueError(
-                "gap must be >= 0"
-            )
-
-        if padding < 0:
-            raise ValueError(
-                "padding must be >= 0"
-            )
-
-        # Normalize border width to:
-        #
-        #     (top, right, bottom, left)
-        #
-        if isinstance(border_width, int):
-            if border_width < 0:
-                raise ValueError(
-                    "border_width must be >= 0"
-                )
-
-            border_width = (
-                border_width,
-                border_width,
-                border_width,
-                border_width,
-            )
-
-        else:
-            if len(border_width) != 4:
-                raise ValueError(
-                    "border_width must be an int or "
-                    "(top, right, bottom, left)"
-                )
-
-            if any(
-                width < 0
-                for width in border_width
-            ):
-                raise ValueError(
-                    "border_width values must be >= 0"
-                )
-
-        valid_sides = {
-            "top",
-            "right",
-            "bottom",
-            "left",
-        }
-
-        if border_sides is None:
-            border_sides = valid_sides.copy()
-        else:
-            border_sides = set(border_sides)
-
-            invalid_sides = (
-                border_sides - valid_sides
-            )
-
-            if invalid_sides:
-                raise ValueError(
-                    f"invalid border sides: "
-                    f"{invalid_sides}"
-                )
-
-        self.children: list[Node] = []
-
-        self.direction = direction
-        self.justify = justify
-        self.align = align
-        self.gap = gap
-        self.padding = padding
-
-        self.background = background
-
-        self.border_width = border_width
-        self.border_color = border_color
-        self.border_sides = border_sides
-
-        for child in children or []:
-            self.add(child)
-
-    def add(self, child: Node) -> None:
-        child.parent = self
-        self.children.append(child)
-
-    def _intrinsic_size(
-        self,
-        parent_width: int | None,
-        parent_height: int | None,
-    ) -> tuple[int, int]:
-        """
-        Calculate the natural size of this container.
-
-        parent_width / parent_height are the dimensions available
-        from the parent. They are used to resolve percentage sizes.
-        """
-        if not self.children:
-            return (
-                self.padding * 2,
-                self.padding * 2,
-            )
-
-        sizes = [
-            child.measure(
-                parent_width,
-                parent_height,
-            )
-            for child in self.children
-        ]
-
-        if self.direction == "row":
-            width = (
-                sum(w for w, _ in sizes)
-                + self.gap * (len(sizes) - 1)
-            )
-
-            height = max(
-                h for _, h in sizes
-            )
-
-        else:
-            width = max(
-                w for w, _ in sizes
-            )
-
-            height = (
-                sum(h for _, h in sizes)
-                + self.gap * (len(sizes) - 1)
-            )
-
-        return (
-            width + self.padding * 2,
-            height + self.padding * 2,
-        )
-
-    def measure(
-        self,
-        parent_width: int | None = None,
-        parent_height: int | None = None,
-    ) -> tuple[int, int]:
-        """
-        Determine this container's size.
-
-        If width/height are explicitly specified, resolve them first.
-        Those resolved dimensions are then used as the basis for
-        percentage-sized children.
-        """
-        width = resolve_size(
-            self.width,
-            parent_width,
-        )
-
-        height = resolve_size(
-            self.height,
-            parent_height,
-        )
-
-        child_parent_width = (
-            max(
-                0,
-                width - self.padding * 2,
-            )
-            if width is not None
-            else parent_width
-        )
-
-        child_parent_height = (
-            max(
-                0,
-                height - self.padding * 2,
-            )
-            if height is not None
-            else parent_height
-        )
-
-        intrinsic_width, intrinsic_height = (
-            self._intrinsic_size(
-                child_parent_width,
-                child_parent_height,
-            )
-        )
-
-        return (
-            width if width is not None else intrinsic_width,
-            height if height is not None else intrinsic_height,
-        )
-
-    def _resolve_child_size(
-        self,
-        child: Node,
-        content_width: int,
-        content_height: int,
-    ) -> tuple[int, int]:
-        """
-        Resolve a child's final size.
-
-        Percentage dimensions are relative to this container's
-        content area.
-        """
-        measured_width, measured_height = child.measure(
-            content_width,
-            content_height,
-        )
-
-        width = resolve_size(
-            child.width,
-            content_width,
-        )
-
-        height = resolve_size(
-            child.height,
-            content_height,
-        )
-
-        if width is None:
-            width = measured_width
-
-        if height is None:
-            height = measured_height
-
-        return width, height
-
-    def _justify(
-        self,
-        available: int,
-        sizes: list[int],
-    ) -> tuple[float, float]:
-        """
-        Returns:
-
-            start_offset:
-                Position of the first child.
-
-            spacing:
-                Additional space between children.
-        """
-        if not sizes:
-            return 0, 0
-
-        total = sum(sizes)
-        remaining = available - total
-
-        if self.justify == "center":
-            return remaining / 2, 0
-
-        if self.justify == "end":
-            return remaining, 0
-
-        if self.justify == "space_between":
-            if len(sizes) == 1:
-                return 0, 0
-
-            return (
-                0,
-                remaining / (len(sizes) - 1),
-            )
-
-        if self.justify == "space_around":
-            spacing = remaining / len(sizes)
-
-            return (
-                spacing / 2,
-                spacing,
-            )
-
-        return 0, 0
-
-    def _cross_position(
-        self,
-        alignment: str,
-        available: int,
-        size: int,
-    ) -> float:
-        remaining = available - size
-
-        if alignment == "center":
-            return remaining / 2
-
-        if alignment == "end":
-            return remaining
-
-        return 0
-
-    def layout(
-        self,
-        parent_width: int | None = None,
-        parent_height: int | None = None,
-    ) -> None:
-        measured_width, measured_height = self.measure(
-            parent_width,
-            parent_height,
-        )
-
-        self.actual_width = (
-            resolve_size(
-                self.width,
-                parent_width,
-            )
-            if self.width is not None
-            else measured_width
-        )
-
-        self.actual_height = (
-            resolve_size(
-                self.height,
-                parent_height,
-            )
-            if self.height is not None
-            else measured_height
-        )
-
-        # Content box.
-        content_width = max(
-            0,
-            self.actual_width - self.padding * 2,
-        )
-
-        content_height = max(
-            0,
-            self.actual_height - self.padding * 2,
-        )
-
-        # Resolve all child sizes against the content box.
-        sizes = [
-            self._resolve_child_size(
-                child,
-                content_width,
-                content_height,
-            )
-            for child in self.children
-        ]
-
-        if self.direction == "row":
-            main_sizes = [
-                width
-                for width, _ in sizes
-            ]
-
-            fixed_gap = self.gap * max(
-                0,
-                len(main_sizes) - 1,
-            )
-
-            start, spacing = self._justify(
-                content_width - fixed_gap,
-                main_sizes,
-            )
-
-            main_position = start
-
-            for child, (
-                child_width,
-                child_height,
-            ) in zip(self.children, sizes):
-
-                alignment = (
-                    child.align_self
-                    if child.align_self is not None
-                    else self.align
-                )
-
-                cross_position = self._cross_position(
-                    alignment,
-                    content_height,
-                    child_height,
-                )
-
-                child.x = (
-                    self.x
-                    + self.padding
-                    + main_position
-                )
-
-                child.y = (
-                    self.y
-                    + self.padding
-                    + cross_position
-                )
-
-                child.actual_width = child_width
-                child.actual_height = child_height
-
-                main_position += (
-                    child_width
-                    + self.gap
-                    + spacing
-                )
-
-        else:
-            main_sizes = [
-                height
-                for _, height in sizes
-            ]
-
-            fixed_gap = self.gap * max(
-                0,
-                len(main_sizes) - 1,
-            )
-
-            start, spacing = self._justify(
-                content_height - fixed_gap,
-                main_sizes,
-            )
-
-            main_position = start
-
-            for child, (
-                child_width,
-                child_height,
-            ) in zip(self.children, sizes):
-
-                alignment = (
-                    child.align_self
-                    if child.align_self is not None
-                    else self.align
-                )
-
-                cross_position = self._cross_position(
-                    alignment,
-                    content_width,
-                    child_width,
-                )
-
-                child.x = (
-                    self.x
-                    + self.padding
-                    + cross_position
-                )
-
-                child.y = (
-                    self.y
-                    + self.padding
-                    + main_position
-                )
-
-                child.actual_width = child_width
-                child.actual_height = child_height
-
-                main_position += (
-                    child_height
-                    + self.gap
-                    + spacing
-                )
-
-        # Recursively lay out nested containers.
-        for child in self.children:
-            if isinstance(child, Container):
-                child.layout(
-                    child.actual_width,
-                    child.actual_height,
-                )
-
-    def draw(self, canvas: Image.Image) -> None:
-        draw = ImageDraw.Draw(canvas)
-
-        x0 = int(self.x)
-        y0 = int(self.y)
-
-        x1 = int(
-            self.x
-            + self.actual_width
-            - 1
-        )
-
-        y1 = int(
-            self.y
-            + self.actual_height
-            - 1
-        )
-
-        # Background.
-        if (
-            self.background is not None
-            and self.actual_width > 0
-            and self.actual_height > 0
-        ):
-            draw.rectangle(
-                (
-                    x0,
-                    y0,
-                    x1,
-                    y1,
-                ),
-                fill=self.background,
-            )
-
-        # Children.
-        for child in self.children:
-            child.draw(canvas)
-
-        # Border.
-        top, right, bottom, left = self.border_width
-
-        if "top" in self.border_sides and top > 0:
-            draw.rectangle(
-                (
-                    x0,
-                    y0,
-                    x1,
-                    y0 + top - 1,
-                ),
-                fill=self.border_color,
-            )
-
-        if "right" in self.border_sides and right > 0:
-            draw.rectangle(
-                (
-                    x1 - right + 1,
-                    y0,
-                    x1,
-                    y1,
-                ),
-                fill=self.border_color,
-            )
-
-        if "bottom" in self.border_sides and bottom > 0:
-            draw.rectangle(
-                (
-                    x0,
-                    y1 - bottom + 1,
-                    x1,
-                    y1,
-                ),
-                fill=self.border_color,
-            )
-
-        if "left" in self.border_sides and left > 0:
-            draw.rectangle(
-                (
-                    x0,
-                    y0,
-                    x0 + left - 1,
-                    y1,
-                ),
-                fill=self.border_color,
-            )
-
-    def render(
-        self,
-        path: str,
-        *,
-        background=(255, 255, 255, 255),
-    ) -> None:
-        width, height = self.measure()
-
-        self.actual_width = width
-        self.actual_height = height
-
-        self.x = 0
-        self.y = 0
-
-        canvas = Image.new(
+        result = Image.new(
             "RGBA",
             (width, height),
-            background,
+            (0, 0, 0, 0),
         )
 
-        self.layout()
+        # Vertically center both images
+        y1 = (height - img1.height) // 2
+        y2 = (height - img2.height) // 2
 
-        self.draw(canvas)
-
-        canvas.save(path)
-
-
-class Text(Node):
-    def __init__(
-        self,
-        text: str,
-        font: ImageFont.FreeTypeFont,
-        *,
-        width: Size = None,
-        height: Size = None,
-        fill=(255, 255, 255, 255),
-        align_self: str | None = None,
-    ):
-        super().__init__(
-            width=width,
-            height=height,
-            align_self=align_self,
+        result.paste(img1, (0, y1), img1)
+        result.paste(
+            img2,
+            (img1.width + padding, y2),
+            img2,
         )
 
-        self.text = text
-        self.font = font
-        self.fill = fill
+    elif direction == "vertical":
+        width = max(img1.width, img2.width)
+        height = img1.height + padding + img2.height
 
-    def measure(
-        self,
-        parent_width: int | None = None,
-        parent_height: int | None = None,
-    ) -> tuple[int, int]:
-        dummy = Image.new(
+        result = Image.new(
             "RGBA",
-            (1, 1),
+            (width, height),
+            (0, 0, 0, 0),
         )
 
-        draw = ImageDraw.Draw(dummy)
+        # Horizontally center both images
+        x1 = (width - img1.width) // 2
+        x2 = (width - img2.width) // 2
 
-        bbox = draw.textbbox(
-            (0, 0),
-            self.text,
-            font=self.font,
+        result.paste(img1, (x1, 0), img1)
+        result.paste(
+            img2,
+            (x2, img1.height + padding),
+            img2,
         )
 
-        intrinsic_width = bbox[2] - bbox[0]
-        intrinsic_height = bbox[3] - bbox[1]
-
-        width = resolve_size(
-            self.width,
-            parent_width,
+    else:
+        raise ValueError(
+            "direction must be 'horizontal' or 'vertical'"
         )
 
-        height = resolve_size(
-            self.height,
-            parent_height,
-        )
+    return result
 
-        return (
-            width if width is not None else intrinsic_width,
-            height if height is not None else intrinsic_height,
-        )
+def create_match_meta(match_data):
+    if not match_data:
+        return None
 
-    def draw(self, canvas: Image.Image) -> None:
-        draw = ImageDraw.Draw(canvas)
+    padding = 20 * supersample_scale
+    line_spacing = 8 * supersample_scale
+
+    lines = [
+        (
+            f"{match_data.get('gameModeName') or '-'} · "
+            f"{match_data.get('mapName') or '-'}",
+            f_bold_16,
+        ),
+        (
+            f"{match_data.get('leaderboardName') or '-'} · "
+            f"{match_data.get('mapSizeName') or '-'}",
+            f_reg_16,
+        ),
+        (
+            f"{match_data.get('server') or '-'}",
+            f_reg_16,
+        ),
+    ]
+
+    bboxes = [
+        font.getbbox(text)
+        for text, font in lines
+    ]
+
+    width = (
+        max(bbox[2] - bbox[0] for bbox in bboxes)
+        + padding * 2
+    )
+
+    # Sum the actual height of each line
+    height = (
+        sum(bbox[3] - bbox[1] for bbox in bboxes)
+        + line_spacing * (len(lines) - 1)
+        + padding * 2
+    )
+
+    img = Image.new("RGBA", (width, height), color=IMAGE_COLORS["background"])
+    draw = ImageDraw.Draw(img)
+
+    y = padding
+
+    for i, (text, font) in enumerate(lines):
+        bbox = font.getbbox(text)
 
         draw.text(
-            (
-                int(self.x),
-                int(self.y),
-            ),
-            self.text,
-            font=self.font,
-            fill=self.fill,
+            (padding - bbox[0], y - bbox[1]),
+            text,
+            font=font,
+            fill=IMAGE_COLORS["primary_text"],
         )
 
+        # Move down by THIS font's actual height
+        y += bbox[3] - bbox[1]
 
-class ImageNode(Node):
-    def __init__(
-        self,
-        image: str | Image.Image,
-        *,
-        width: Size = None,
-        height: Size = None,
-        scale: float = 1.0,
-        align_self: str | None = None,
-    ):
-        super().__init__(
-            width=width,
-            height=height,
-            align_self=align_self,
+        if i < len(lines) - 1:
+            y += line_spacing
+
+    return img
+
+def centered_text_y(draw, cursor_y, row_height, text, font):
+    """Vertically center text within a row, correcting for the
+    font's ascender offset so the glyph ink is centered, not
+    just its bounding box."""
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_height = bbox[3] - bbox[1]
+    return cursor_y + (row_height - text_height) // 2 - bbox[1]
+
+def make_team_data(team, team_width):
+    """Create and return an image containing all players on a team."""
+
+    players = team.get("players") or []
+
+    row_height = 52 * supersample_scale
+    row_gap = 8 * supersample_scale
+    team_width = team_width * supersample_scale
+
+    team_height = (
+        len(players) * row_height
+        + max(0, len(players) - 1) * row_gap
+    )
+
+    team_image = Image.new(
+        "RGBA",
+        (team_width, team_height),
+        (0, 0, 0, 0),
+    )
+
+    draw = ImageDraw.Draw(team_image)
+
+    cursor_y = 0
+
+    for player in players:
+        accent_color = PLAYER_COLORS.get(
+            player.get("color"),
+            "#72767D",
         )
 
-        if scale <= 0:
-            raise ValueError(
-                "scale must be greater than 0"
+        player_name = player.get("name") or "Unknown"
+        player_rating = str(player.get("rating") or "-")
+
+        civ = player.get("civ") or "-"
+        civ_icon = load_civ_icon(civ)
+
+        # Player card
+        draw.rounded_rectangle(
+            [
+                0,
+                cursor_y,
+                team_width,
+                cursor_y + row_height,
+            ],
+            radius=10 * supersample_scale,
+            fill=IMAGE_COLORS["card_background"],
+        )
+
+        # Player color accent
+        draw.rounded_rectangle(
+            [
+                0,
+                cursor_y,
+                5 * supersample_scale,
+                cursor_y + row_height,
+            ],
+            radius=3 * supersample_scale,
+            fill=accent_color,
+        )
+
+        # Civilization icon
+        civ_icon_size = 40 * supersample_scale
+        icon_gap = 10 * supersample_scale
+
+        icon_x = 5 * supersample_scale + icon_gap
+        icon_y = cursor_y + (row_height - civ_icon_size) // 2
+
+        if civ_icon:
+            civ_icon = civ_icon.resize(
+                (civ_icon_size, civ_icon_size),
+                Image.LANCZOS,
             )
 
-        self.scale = scale
-
-        if isinstance(image, Image.Image):
-            self.image = image.convert("RGBA")
-        else:
-            self.image = Image.open(image).convert("RGBA")
-
-    def measure(
-        self,
-        parent_width: int | None = None,
-        parent_height: int | None = None,
-    ) -> tuple[int, int]:
-        width = resolve_size(
-            self.width,
-            parent_width,
-        )
-
-        height = resolve_size(
-            self.height,
-            parent_height,
-        )
-
-        # Scale intrinsic dimensions.
-        if width is None:
-            width = round(
-                self.image.width * self.scale
+            team_image.paste(
+                civ_icon,
+                (icon_x, icon_y),
+                civ_icon,
             )
 
-        if height is None:
-            height = round(
-                self.image.height * self.scale
-            )
+        # Player name
+        player_name_x = (
+            icon_x
+            + civ_icon_size
+            + 12 * supersample_scale
+        )
 
-        return width, height
+        rating_width = draw.textlength(
+            player_rating,
+            font=f_reg_16,
+        )
 
-    def draw(self, canvas: Image.Image) -> None:
-        image = self.image
+        max_name_width = (
+            team_width
+            - 16 * supersample_scale
+            - rating_width
+            - player_name_x
+        )
 
-        if (
-            image.width != self.actual_width
-            or image.height != self.actual_height
+        name = player_name
+
+        while (
+            draw.textlength(name, font=f_reg_16) > max_name_width
+            and len(name) > 1
         ):
-            image = image.resize(
-                (
-                    self.actual_width,
-                    self.actual_height,
-                ),
-                Image.Resampling.LANCZOS,
-            )
+            name = name[:-2] + "…"
 
-        canvas.alpha_composite(
-            image,
-            (
-                int(self.x),
-                int(self.y),
-            ),
+        name_y = centered_text_y(
+            draw,
+            cursor_y,
+            row_height,
+            name,
+            f_reg_16,
         )
+
+        draw.text(
+            (player_name_x, name_y),
+            name,
+            font=f_reg_16,
+            fill=IMAGE_COLORS["primary_text"],
+        )
+
+        # Rating
+        rating_x = (
+            team_width
+            - 16 * supersample_scale
+            - rating_width
+        )
+
+        rating_y = centered_text_y(
+            draw,
+            cursor_y,
+            row_height,
+            player_rating,
+            f_reg_16,
+        )
+
+        draw.text(
+            (rating_x, rating_y),
+            player_rating,
+            font=f_reg_16,
+            fill=IMAGE_COLORS["rating_text"],
+        )
+
+        cursor_y += row_height + row_gap
+
+    return team_image
+
+def make_match_started_image(match_data):
+    map_icon = load_map_icon(match_data.get("mapName"))
+
+    meta_image = merge_images(map_icon, create_match_meta (match_data), "horizontal", 20)
+
+    teams = match_data.get ("teams") or None
+
+    teams_images = []
+    for team in teams:
+        team_image = make_team_data(team, team_width)
+        teams_images.append(team_image)
+
+
+    teams_image_merged = None
+
+    for i in range(0, len(teams_images), 2):
+        image_a = teams_images[i]
+        image_b = teams_images[i + 1] if i + 1 < len(teams_images) else None
+
+        teams_image_duo = None
+
+        if image_b is None:
+            teams_image_duo = image_a
+
+        else:
+            teams_image_duo = merge_images(image_a, image_b, direction="horizontal", padding=100)
+
+        if teams_image_merged is None:
+            teams_image_merged = teams_image_duo
+            continue
+
+        teams_image_merged = merge_images(teams_image_merged, teams_image_duo, padding=50)
+
+    image = merge_images(meta_image, teams_image_merged, padding=100)
+
+    # make final image 10 percent bigger 
+    final_image = Image.new(
+        "RGB",
+        (image.width + int(image.width * 0.10),
+        image.height + int(image.height * 0.10)),
+        color=IMAGE_COLORS["background"])
+
+    final_image.paste(
+        image,
+        center_to_topleft(
+            final_image.width // 2,
+            final_image.height // 2,
+            image),
+        image,
+    )
+
+    # Downscale back to logical size with LANCZOS for a crisp, antialiased result.
+    final_image = final_image.resize(
+        (final_image.width // supersample_scale,
+        final_image.height // supersample_scale),
+        Image.LANCZOS)
+
+    buffer = io.BytesIO()
+
+    final_image.save(
+        buffer,
+        "PNG",
+    )
+
+    buffer.seek(0)
+
+    return buffer
