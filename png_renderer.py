@@ -363,7 +363,7 @@ def make_team_data(team, team_width):
 
     return team_image
 
-def make_match_started_image(match_data):
+def make_match_image(match_data):
     map_icon = load_map_icon(match_data.get("mapName"))
 
     meta_image = merge_images(map_icon, create_match_meta (match_data), "horizontal", 20)

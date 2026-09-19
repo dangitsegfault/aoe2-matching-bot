@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import discord
 import io
 import os
-from png_renderer import make_match_started_image
+from png_renderer import make_match_image
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -69,8 +69,7 @@ class MatchHandler:
                 continue
 
             content = self.make_match_started_content(match_data)
-            image = make_match_started_image(match_data)
-
+            image = make_match_image(match_data)
 
             self.matches[match_id] = {
                 "data": match_data,
@@ -100,20 +99,22 @@ class MatchHandler:
 
             self.matches[match_id]["data"] = match_data 
             content = self.make_match_finished_content(match_data)
-            embed = self.make_match_finished_embed(match_data)
+            image = make_match_image(match_data)
 
             for guild_id, message_id in self.matches[match_id]["messages"].items():
                 if message_id is None:
                     continue
 
-                await bot.update_match_message(
+                message_update_status = await bot.update_match_message(
                     message_id,
                     guild_id,
                     content,
-                    embed,
+                    image,
+                    match_id
                 )
-
-            del self.matches[match_id]
+                
+                if message_update_status is True:
+                    del self.matches[match_id]
                     
     def make_match_started_embed(self, match_data):
         embed = discord.Embed(

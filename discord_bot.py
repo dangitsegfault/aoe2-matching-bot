@@ -78,31 +78,46 @@ class DiscordBot(discord.Client):
 
         return message.id
 
-    async def update_match_message(self, message_id, guild_id, content, embed):
-        settings = db.get_channel_ids(guild_id)
+    async def update_match_message(self, message_id, guild_id, content, image, match_id):
+        print(f"update_match_message called for match {match_id}, guild {guild_id}")
 
+        settings = db.get_channel_ids(guild_id)
         if settings is None:
-            return
+            print(f"  no channel settings for guild {guild_id}")
+            return None
 
         channel_id = settings["spectate_channel_id"]
-
         if channel_id is None:
-            return
+            print(f"  spectate_channel_id not set for guild {guild_id}")
+            return None
 
         channel = self.get_channel(channel_id)
-
         if channel is None:
             channel = await self.fetch_channel(channel_id)
+        print(f"  resolved channel: {channel}")
 
         message = await channel.fetch_message(message_id)
 
-        await message.edit(
-            content=content,
-            embed=embed,
-            view=None,
+        filename = f"match_{match_id}.png"
+        file = discord.File(
+            io.BytesIO(image.getvalue()),
+            filename=filename,
         )
+        try:
+            message = await message.edit(
+                content=content,
+                attachments=[file],
+                view=None,
+            )
+            print(f"  sent updated {message.id}")
+        except discord.HTTPException as e:
+            print(f"  Failed to update match message: {e}")
+            return False
+
+        return True
 
 
+    
 bot = DiscordBot()
 
 @bot.tree.command(
