@@ -31,8 +31,6 @@ f_bold_18 = ImageFont.truetype(FONT_BOLD, 18 * supersample_scale)
 f_reg_16 = ImageFont.truetype(FONT_REG, 16 * supersample_scale)
 f_bold_16 = ImageFont.truetype(FONT_BOLD, 16 * supersample_scale)
 
-team_width = 280
-
 def calculate_match_duration (start_time, finish_time):
     if start_time is None or finish_time is None:
         return "0h 0m"
@@ -235,14 +233,40 @@ def centered_text_y(draw, cursor_y, row_height, text, font):
     text_height = bbox[3] - bbox[1]
     return cursor_y + (row_height - text_height) // 2 - bbox[1]
 
-def make_team_data(team, team_width):
+def make_team_data(team, match_finished=False, is_ranked=False):
     """Create and return an image containing all players on a team."""
+
+    edge_padding = 10 * supersample_scale
+    children_padding = 10 * supersample_scale
+
+    civ_icon_size = 40 * supersample_scale
+    result_icon_size = 20 * supersample_scale if not match_finished else 0
+
+    font = f_reg_16
+    player_name_width = f_reg_16.getlength("XXXXXXXXXXXXXXXXX") + children_padding;
+    rating_width = (f_reg_16.getlength("XXXX") + children_padding) if is_ranked else 0;
+    if rating_width > 0:
+        rating_width = rating_width + edge_padding if not match_finished else 0
+
+    team_width = civ_icon_size + player_name_width + rating_width + result_icon_size + edge_padding
+
+    civ_icon_x = 5 * supersample_scale + children_padding
+    result_icon_x = team_width - (children_padding + edge_padding)
+
+    player_name_x = (
+        civ_icon_x
+        + civ_icon_size
+        + children_padding
+    )
+
+    rating_x = (
+        player_name_x + player_name_width + children_padding
+    )
 
     players = team.get("players") or []
 
     row_height = 52 * supersample_scale
     row_gap = 8 * supersample_scale
-    team_width = team_width * supersample_scale
 
     team_height = (
         len(players) * row_height
@@ -251,7 +275,7 @@ def make_team_data(team, team_width):
 
     team_image = Image.new(
         "RGBA",
-        (team_width, team_height),
+        (int(team_width), team_height),
         (0, 0, 0, 0),
     )
 
@@ -266,7 +290,12 @@ def make_team_data(team, team_width):
         )
 
         player_name = player.get("name") or "Unknown"
-        player_rating = str(player.get("rating") or "-")
+
+        if is_ranked:
+            player_rating = str(player.get("rating") or "-")
+
+        if match_finished:
+            match_result = "victory" if player.get("won") else "defeat"
 
         civ = player.get("civ") or "-"
         civ_icon = load_civ_icon(civ)
@@ -295,12 +324,7 @@ def make_team_data(team, team_width):
             fill=accent_color,
         )
 
-        # Civilization icon
-        civ_icon_size = 40 * supersample_scale
-        icon_gap = 10 * supersample_scale
-
-        icon_x = 5 * supersample_scale + icon_gap
-        icon_y = cursor_y + (row_height - civ_icon_size) // 2
+        civ_icon_y = cursor_y + (row_height - civ_icon_size) // 2
 
         if civ_icon:
             civ_icon = civ_icon.resize(
@@ -310,33 +334,14 @@ def make_team_data(team, team_width):
 
             team_image.paste(
                 civ_icon,
-                (icon_x, icon_y),
+                (civ_icon_x, civ_icon_y),
                 civ_icon,
             )
-
-        # Player name
-        player_name_x = (
-            icon_x
-            + civ_icon_size
-            + 12 * supersample_scale
-        )
-
-        rating_width = draw.textlength(
-            player_rating,
-            font=f_reg_16,
-        )
-
-        max_name_width = (
-            team_width
-            - 16 * supersample_scale
-            - rating_width
-            - player_name_x
-        )
 
         name = player_name
 
         while (
-            draw.textlength(name, font=f_reg_16) > max_name_width
+            draw.textlength(name, font=f_reg_16) > player_name_width
             and len(name) > 1
         ):
             name = name[:-2] + "…"
@@ -356,27 +361,21 @@ def make_team_data(team, team_width):
             fill=IMAGE_COLORS["primary_text"],
         )
 
-        # Rating
-        rating_x = (
-            team_width
-            - 16 * supersample_scale
-            - rating_width
-        )
+        if is_ranked:
+            rating_y = centered_text_y(
+                draw,
+                cursor_y,
+                row_height,
+                player_rating,
+                f_reg_16,
+            )
 
-        rating_y = centered_text_y(
-            draw,
-            cursor_y,
-            row_height,
-            player_rating,
-            f_reg_16,
-        )
-
-        draw.text(
-            (rating_x, rating_y),
-            player_rating,
-            font=f_reg_16,
-            fill=IMAGE_COLORS["rating_text"],
-        )
+            draw.text(
+                (rating_x, rating_y),
+                player_rating,
+                font=f_reg_16,
+                fill=IMAGE_COLORS["rating_text"],
+            )
 
         cursor_y += row_height + row_gap
 
@@ -391,7 +390,7 @@ def make_match_image(match_data):
 
     teams_images = []
     for team in teams:
-        team_image = make_team_data(team, team_width)
+        team_image = make_team_data(team, match_data.get("finished") is not None)
         teams_images.append(team_image)
 
 
