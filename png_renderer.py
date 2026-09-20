@@ -23,6 +23,8 @@ IMAGE_COLORS = {
     "primary_text": (255, 255, 255, 255),
     "rating_text": (219, 222, 225, 255),
     "vs_text_color": (181, 186, 193, 255),
+    "border": (39, 139, 245, 255),
+    "transparent": (0, 0, 0, 0),
 }
 
 supersample_scale = 3
@@ -136,7 +138,7 @@ def merge_images(img1, img2, direction="vertical", padding=0):
         result = Image.new(
             "RGBA",
             (width, height),
-            (0, 0, 0, 0),
+            color=IMAGE_COLORS["transparent"],
         )
 
         # Vertically center both images
@@ -157,7 +159,7 @@ def merge_images(img1, img2, direction="vertical", padding=0):
         result = Image.new(
             "RGBA",
             (width, height),
-            (0, 0, 0, 0),
+            color=IMAGE_COLORS["transparent"],
         )
 
         # Horizontally center both images
@@ -219,7 +221,7 @@ def create_match_meta(match_data):
         + padding * 2
     )
 
-    img = Image.new("RGBA", (width, height), color=IMAGE_COLORS["background"])
+    img = Image.new("RGBA", (width, height), color=IMAGE_COLORS["transparent"])
     draw = ImageDraw.Draw(img)
 
     y = padding
@@ -306,7 +308,7 @@ def make_team_data(team, match_finished=False, is_ranked=False):
     team_image = Image.new(
         "RGBA",
         (team_width, team_height),
-        (0, 0, 0, 0),
+        color=IMAGE_COLORS["transparent"],
     )
 
     draw = ImageDraw.Draw(team_image)
@@ -473,10 +475,25 @@ def make_match_image(match_data):
 
     # make final image 10 percent bigger 
     final_image = Image.new(
-        "RGB",
+        "RGBA",
         (image.width + int(image.width * 0.10),
         image.height + int(image.height * 0.10)),
-        color=IMAGE_COLORS["background"])
+        color=IMAGE_COLORS["transparent"])
+
+    draw = ImageDraw.Draw(final_image)
+
+    draw.rounded_rectangle(
+        [
+            0,
+            0,
+            final_image.width - 1,
+            final_image.height - 1,
+        ],
+        radius=10 * supersample_scale,
+        outline=IMAGE_COLORS["border"],
+        fill=IMAGE_COLORS["background"],
+        width=3 * supersample_scale,
+    )
 
     final_image.paste(
         image,
