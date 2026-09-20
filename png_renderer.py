@@ -25,6 +25,8 @@ IMAGE_COLORS = {
     "vs_text_color": (181, 186, 193, 255),
     "border": (39, 139, 245, 255),
     "transparent": (0, 0, 0, 0),
+    "rating_diff_positive": (61, 212, 36, 255),
+    "rating_diff_negative": (255, 0, 0, 255),
 }
 
 supersample_scale = 3
@@ -270,11 +272,18 @@ def make_team_data(team, match_finished=False, is_ranked=False):
         int(f_bold_16.getlength("8888"))
         if is_ranked else 0
     )
+    rating_diff_width = (
+        int(f_bold_16.getlength("+88"))
+        if is_ranked and match_finished else 0
+    )
 
     team_width = edge_padding + civ_icon_size + children_padding + player_name_width + edge_padding
 
     if is_ranked:
         team_width = team_width + children_padding + rating_width
+
+        if match_finished:
+            team_width = team_width + children_padding + rating_diff_width
 
     if match_finished:
         team_width = team_width + children_padding + result_icon_size
@@ -289,11 +298,16 @@ def make_team_data(team, match_finished=False, is_ranked=False):
 
     rating_x = player_name_x + player_name_width + children_padding
     
-    result_icon_x = (
-        rating_x + rating_width + children_padding
-        if is_ranked
-        else player_name_x + player_name_width + children_padding
-    )
+    if is_ranked:
+        if match_finished:
+            rating_diff_x = rating_x + rating_width + children_padding
+            result_icon_x = rating_diff_x + rating_diff_width + children_padding
+
+        else:
+            result_icon_x = rating_x + rating_width + children_padding
+
+    else:
+        result_icon_x = player_name_x + player_name_width + children_padding
 
     players = team.get("players") or []
 
@@ -325,6 +339,9 @@ def make_team_data(team, match_finished=False, is_ranked=False):
 
         if is_ranked:
             player_rating = str(player.get("rating") or "-")
+
+            if match_finished:
+                player_rating_diff = f"{player.get('ratingDiff') or 0:+}"
 
         civ = player.get("civ") or "-"
         civ_icon = load_civ_icon(civ)
@@ -407,12 +424,32 @@ def make_team_data(team, match_finished=False, is_ranked=False):
             )
 
         if match_finished:
-            game_result = player.get("won")
+            game_won = player.get("won")
 
-            if game_result is True:
+            if is_ranked:
+                rating_diff_y = centered_text_y(
+                    draw,
+                    cursor_y,
+                    row_height,
+                    player_rating_diff,
+                    f_bold_16,
+                )
+
+                draw.text(
+                    (rating_diff_x, rating_diff_y),
+                    player_rating_diff,
+                    font=f_bold_16,
+                    fill=(
+                        IMAGE_COLORS["rating_diff_positive"]
+                        if game_won is True
+                        else IMAGE_COLORS["rating_diff_negative"]
+                    )
+                )
+
+            if game_won is True:
                 result_icon = result_victory
 
-            elif game_result is False:
+            elif game_won is False:
                 result_icon = result_defeat
 
             else:
