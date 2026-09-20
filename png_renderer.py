@@ -442,9 +442,12 @@ def make_match_image(match_data):
 
     teams_images = []
     for team in teams:
-        team_image = make_team_data(team, match_data.get("finished") is not None)
+        team_image = make_team_data(
+            team,
+            match_data.get("finished") is not None,
+            match_data.get("leaderboard") != "unranked"
+        )
         teams_images.append(team_image)
-
 
     teams_image_merged = None
 
