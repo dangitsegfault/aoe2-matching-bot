@@ -48,6 +48,23 @@ def calculate_match_duration (start_time, finish_time):
     else:
         return f"{minutes}m"
 
+def load_result_icon(result):
+    if not result:
+        return None
+
+    path = os.path.join(
+        BASE_DIR,
+        "assets",
+        "icons",
+        "result",
+        f"{result}.png",
+    )
+
+    if not os.path.exists(path):
+        return None
+
+    return Image.open(path).convert("RGBA")
+
 def load_civ_icon(civ):
     if not civ:
         return None
@@ -236,22 +253,31 @@ def centered_text_y(draw, cursor_y, row_height, text, font):
 def make_team_data(team, match_finished=False, is_ranked=False):
     """Create and return an image containing all players on a team."""
 
-    edge_padding = 10 * supersample_scale
+    result_victory = load_result_icon("victory")
+    result_defeat = load_result_icon("defeat")
+    result_unknown = load_result_icon("unknown")
+
+    edge_padding = 15 * supersample_scale
     children_padding = 10 * supersample_scale
 
     civ_icon_size = 40 * supersample_scale
-    result_icon_size = 20 * supersample_scale if not match_finished else 0
+    result_icon_size = 30 * supersample_scale if match_finished else 0
 
-    font = f_reg_16
-    player_name_width = f_reg_16.getlength("XXXXXXXXXXXXXXXXX") + children_padding;
-    rating_width = (f_reg_16.getlength("XXXX") + children_padding) if is_ranked else 0;
-    if rating_width > 0:
-        rating_width = rating_width + edge_padding if not match_finished else 0
+    player_name_width = int (f_reg_16.getlength("XXXXXXXXXXXXXXXXX"))
+    rating_width = (
+        int(f_bold_16.getlength("8888"))
+        if is_ranked else 0
+    )
 
-    team_width = civ_icon_size + player_name_width + rating_width + result_icon_size + edge_padding
+    team_width = edge_padding + civ_icon_size + children_padding + player_name_width + edge_padding
 
-    civ_icon_x = 5 * supersample_scale + children_padding
-    result_icon_x = team_width - (children_padding + edge_padding)
+    if is_ranked:
+        team_width = team_width + children_padding + rating_width
+
+    if match_finished:
+        team_width = team_width + children_padding + result_icon_size
+
+    civ_icon_x = edge_padding
 
     player_name_x = (
         civ_icon_x
@@ -259,8 +285,12 @@ def make_team_data(team, match_finished=False, is_ranked=False):
         + children_padding
     )
 
-    rating_x = (
-        player_name_x + player_name_width + children_padding
+    rating_x = player_name_x + player_name_width + children_padding
+    
+    result_icon_x = (
+        rating_x + rating_width + children_padding
+        if is_ranked
+        else player_name_x + player_name_width + children_padding
     )
 
     players = team.get("players") or []
@@ -275,7 +305,7 @@ def make_team_data(team, match_finished=False, is_ranked=False):
 
     team_image = Image.new(
         "RGBA",
-        (int(team_width), team_height),
+        (team_width, team_height),
         (0, 0, 0, 0),
     )
 
@@ -293,9 +323,6 @@ def make_team_data(team, match_finished=False, is_ranked=False):
 
         if is_ranked:
             player_rating = str(player.get("rating") or "-")
-
-        if match_finished:
-            match_result = "victory" if player.get("won") else "defeat"
 
         civ = player.get("civ") or "-"
         civ_icon = load_civ_icon(civ)
@@ -367,14 +394,39 @@ def make_team_data(team, match_finished=False, is_ranked=False):
                 cursor_y,
                 row_height,
                 player_rating,
-                f_reg_16,
+                f_bold_16,
             )
 
             draw.text(
                 (rating_x, rating_y),
                 player_rating,
-                font=f_reg_16,
+                font=f_bold_16,
                 fill=IMAGE_COLORS["rating_text"],
+            )
+
+        if match_finished:
+            game_result = player.get("won")
+
+            if game_result is True:
+                result_icon = result_victory
+
+            elif game_result is False:
+                result_icon = result_defeat
+
+            else:
+                result_icon = result_unknown
+
+            result_icon = result_icon.resize(
+                (result_icon_size, result_icon_size),
+                Image.LANCZOS,
+            )
+
+            result_icon_y = cursor_y + (row_height - result_icon_size) // 2
+
+            team_image.paste(
+                result_icon,
+                (result_icon_x, result_icon_y),
+                result_icon,
             )
 
         cursor_y += row_height + row_gap
