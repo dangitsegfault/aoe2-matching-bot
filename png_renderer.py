@@ -113,7 +113,7 @@ def load_map_icon(target_map):
             "assets",
             "icons",
             "maps",
-            "Unknown.png",
+            "cm_generic.png",
             )
 
         if not os.path.exists(fallback_path):
@@ -436,7 +436,7 @@ def make_team_data(team, match_finished=False, is_ranked=False):
     return team_image
 
 def make_match_image(match_data):
-    map_icon = load_map_icon(match_data.get("mapName"))
+    map_icon = load_map_icon(match_data.get("map"))
 
     meta_image = merge_images(map_icon, create_match_meta (match_data), "horizontal", 20)
 
