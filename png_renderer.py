@@ -34,6 +34,7 @@ supersample_scale = 3
 f_bold_18 = ImageFont.truetype(FONT_BOLD, 18 * supersample_scale)
 f_reg_16 = ImageFont.truetype(FONT_REG, 16 * supersample_scale)
 f_bold_16 = ImageFont.truetype(FONT_BOLD, 16 * supersample_scale)
+vs_font = ImageFont.truetype(FONT_BOLD, 18 * supersample_scale)
 
 def calculate_match_duration (start_time, finish_time):
     if start_time is None or finish_time is None:
@@ -488,27 +489,57 @@ def make_match_image(match_data):
         )
         teams_images.append(team_image)
 
+
+    team_count = len(teams_images)
+    max_player_per_team = max(len(team.get("players", [])) for team in teams)
+
     teams_image_merged = None
 
-    for i in range(0, len(teams_images), 2):
-        image_a = teams_images[i]
-        image_b = teams_images[i + 1] if i + 1 < len(teams_images) else None
+    if team_count < 3 and max_player_per_team < 3:
+        vs_text = "Vs"
+        bbox = vs_font.getbbox(vs_text)
 
-        teams_image_duo = None
+        vs_text_width = int (bbox[2] - bbox[0])
+        vs_text_height = int(bbox[3] - bbox[1])
 
-        if image_b is None:
-            teams_image_duo = image_a
+        vs_text_image = Image.new(
+            "RGBA",
+            (vs_text_width, vs_text_height),
+            color=IMAGE_COLORS["transparent"])
 
-        else:
-            teams_image_duo = merge_images(image_a, image_b, direction="horizontal", padding=100)
+        vs_text_draw = ImageDraw.Draw(vs_text_image)
 
-        if teams_image_merged is None:
-            teams_image_merged = teams_image_duo
-            continue
+        vs_text_draw.text(
+            (-bbox[0], -bbox[1]),
+            vs_text,
+            font=vs_font,
+            fill=IMAGE_COLORS["vs_text_color"]
+        )
 
-        teams_image_merged = merge_images(teams_image_merged, teams_image_duo, padding=50)
+        teams_image_merged = merge_images(teams_images[0], vs_text_image, direction="vertical", padding=50)
+        teams_image_merged = merge_images(teams_image_merged, teams_images[1], direction="vertical", padding=50)
 
-    image = merge_images(meta_image, teams_image_merged, padding=100)
+    else:
+        for i in range(0, len(teams_images), 2):
+            image_a = teams_images[i]
+            image_b = teams_images[i + 1] if i + 1 < len(teams_images) else None
+
+            teams_image_duo = None
+
+            if image_b is None:
+                teams_image_duo = image_a
+
+            else:
+                teams_image_duo = merge_images(image_a, image_b, direction="horizontal", padding=100)
+
+            if teams_image_merged is None:
+                teams_image_merged = teams_image_duo
+                continue
+
+            teams_image_merged = merge_images(teams_image_merged, teams_image_duo,
+                                              direction="vertical", padding=50)
+
+    image = merge_images(meta_image, teams_image_merged, direction="vertical", padding=100)
 
     # make final image 10 percent bigger 
     final_image = Image.new(
