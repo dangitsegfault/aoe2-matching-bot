@@ -32,6 +32,22 @@ class DiscordBot(discord.Client):
     async def on_ready(self):
         print(f"Logged in as {self.user}")
 
+        await self.cleanup_stale_guilds()
+
+    async def cleanup_stale_guilds(self):
+        actual_guild_ids = {guild.id for guild in self.guilds}
+        database_guild_ids = db.get_all_guild_ids()
+
+        stale_guild_ids = database_guild_ids - actual_guild_ids
+
+        for guild_id in stale_guild_ids:
+            print(f"Removing stale guild {guild_id} from database")
+            db.delete_guild(guild_id)
+
+    async def on_guild_remove(self, guild):
+        print(f"Bot removed from guild {guild.id} ({guild.name})")
+        db.delete_guild(guild.id)
+
     def make_match_started_view(self, match_id):
         view = discord.ui.View()
 

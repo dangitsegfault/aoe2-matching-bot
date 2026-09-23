@@ -151,7 +151,26 @@ class DatabaseHandler:
             """, (profile_id,)).fetchall()
 
         return [row[0] for row in rows]
-        
+
+    def delete_guild(self, guild_id):
+        with sqlite3.connect(self.db_path) as db:
+            db.execute(
+                "DELETE FROM members WHERE guild_id = ?",
+                (guild_id,)
+            )
+
+            db.execute(
+                "DELETE FROM guilds WHERE guild_id = ?",
+                (guild_id,)
+            )
+
+    def get_all_guild_ids(self):
+        with sqlite3.connect(self.db_path) as db:
+            rows = db.execute(
+                "SELECT guild_id FROM guilds"
+            ).fetchall()
+
+        return {row[0] for row in rows}
 
 db = DatabaseHandler(DB_FILE_PATH)
 db.check_integrity()
