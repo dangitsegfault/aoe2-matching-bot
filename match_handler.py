@@ -83,7 +83,12 @@ class MatchHandler:
                     match_id,
                     guild_id,
                 )
-                self.matches[match_id]["messages"][guild_id] = message_id
+
+                if message_id is not None:
+                    self.matches[match_id]["messages"][guild_id] = message_id
+
+            if not self.matches[match_id]["messages"]:
+                del self.matches[match_id]
 
     async def parse_matches_finished(self, started_matches):
         for match_data in started_matches:
@@ -101,6 +106,8 @@ class MatchHandler:
             content = self.make_match_finished_content(match_data)
             image = make_match_image(match_data)
 
+            all_updated = True
+
             for guild_id, message_id in self.matches[match_id]["messages"].items():
                 if message_id is None:
                     continue
@@ -113,8 +120,11 @@ class MatchHandler:
                     match_id
                 )
                 
-                if message_update_status is True:
-                    del self.matches[match_id]
+                if message_update_status is not True:
+                    all_updated = False
+
+            if all_updated:
+                del self.matches[match_id]
 
     def make_match_started_content(self, match_data):
         timestamp = self.get_discord_timestamp(

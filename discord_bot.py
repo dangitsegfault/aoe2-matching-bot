@@ -92,7 +92,15 @@ class DiscordBot(discord.Client):
 
         channel = self.get_channel(channel_id)
         if channel is None:
-            channel = await self.fetch_channel(channel_id)
+            try:
+                channel = await self.fetch_channel(channel_id)
+
+            except discord.Forbidden:
+                print(f"  No permission to access channel {channel_id} in guild {guild_id}")
+                return None
+            except discord.HTTPException as e:
+                print(f"  Failed to fetch channel having id {channel_id} with error message: {e}")
+                return None
         print(f"  resolved channel: {channel}")
 
         filename = f"match_{match_id}.png"
