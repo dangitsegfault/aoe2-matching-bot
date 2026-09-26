@@ -479,6 +479,8 @@ def make_match_image(match_data):
     meta_image = merge_images(map_icon, create_match_meta (match_data), "horizontal", 20)
 
     teams = match_data.get ("teams") or None
+    for team in teams:
+        team["players"].sort(key=lambda player: player["color"])
 
     teams_images = []
     for team in teams:
