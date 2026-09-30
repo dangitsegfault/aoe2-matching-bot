@@ -1,0 +1,2 @@
+* Map Icons
+The map icons are found at ~resources/_common/wpfg/resources/mapicons~
