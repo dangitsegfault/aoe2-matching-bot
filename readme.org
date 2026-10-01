@@ -1,2 +1,7 @@
+* Discord Permissions Required
+The following permissions are required in the developers portal
+- View Channels
+- Send Messages
+- Attach Files
 * Map Icons
 The map icons are found at ~resources/_common/wpfg/resources/mapicons~
