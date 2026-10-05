@@ -36,22 +36,23 @@ f_reg_16 = ImageFont.truetype(FONT_REG, 16 * supersample_scale)
 f_bold_16 = ImageFont.truetype(FONT_BOLD, 16 * supersample_scale)
 vs_font = ImageFont.truetype(FONT_BOLD, 18 * supersample_scale)
 
-def calculate_match_duration (start_time, finish_time):
-    if start_time is None or finish_time is None:
-        return "0h 0m"
+def calculate_match_duration (start_time, finish_time, speed_factor=1.7):
+    if start_time is None or finish_time is None or speed_factor is None:
+        return "Duration Unknown"
     
     started = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
     finished = datetime.fromisoformat(finish_time.replace("Z", "+00:00"))
 
     duration = finished - started
+    total_seconds = duration.total_seconds() * float(speed_factor)
 
-    hours, remainder = divmod(int(duration.total_seconds()), 3600)
-    minutes = remainder // 60
+    hours, remainder = divmod(int(total_seconds), 3600)
+    minutes, seconds = divmod(remainder, 60)
 
     if hours:
         return f"{hours}h {minutes}m"
     else:
-        return f"{minutes}m"
+        return f"{minutes}m {seconds}s"
 
 def load_result_icon(result):
     if not result:
@@ -190,6 +191,13 @@ def create_match_meta(match_data):
     padding = 20 * supersample_scale
     line_spacing = 8 * supersample_scale
 
+    server = match_data.get('server')
+    duration = calculate_match_duration(
+        match_data.get('started'),
+        match_data.get('finished'),
+        match_data.get('speedFactor'),
+    )
+
     lines = [
         (
             f"{match_data.get('gameModeName') or '-'} · "
@@ -202,7 +210,7 @@ def create_match_meta(match_data):
             f_reg_16,
         ),
         (
-            f"{match_data.get('server') or calculate_match_duration(match_data.get('started'), match_data.get('finished'))}",
+            f"{server or duration or '-'}",
             f_reg_16,
         ),
     ]
