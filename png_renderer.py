@@ -38,7 +38,7 @@ vs_font = ImageFont.truetype(FONT_BOLD, 18 * supersample_scale)
 
 def calculate_match_duration (start_time, finish_time, speed_factor=1.7):
     if start_time is None or finish_time is None or speed_factor is None:
-        return "Duration Unknown"
+        return None
     
     started = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
     finished = datetime.fromisoformat(finish_time.replace("Z", "+00:00"))
@@ -210,7 +210,7 @@ def create_match_meta(match_data):
             f_reg_16,
         ),
         (
-            f"{server or duration or '-'}",
+            f"{server or '-'}{f' · {duration}' if duration else ''}",
             f_reg_16,
         ),
     ]
