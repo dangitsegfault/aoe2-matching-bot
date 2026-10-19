@@ -5,3 +5,10 @@ The following permissions are required in the developers portal
 - Attach Files
 * Map Icons
 The map icons are found at ~resources/_common/wpfg/resources/mapicons~
+
+* Todo List
+- [ ] Store bot logs and errors in a file so that they can survive restarts. Also store bot crashes in there. Then add a environment variable to select logging priority (info, error etc)
+- [ ] If a guild is removed mid-game, any on-going matches related to that guild will not be removed and might crash the bot when try to update those messages.
+- [ ] Update the schema to use ON_DELETE CASCADE on guild_id foreign key.
+- [ ] Add support for names in language other than English. Chinese is the first one to add support for.
+- [ ] Add CI/CD for the bot.
