@@ -9,16 +9,22 @@ import websockets
 
 CONNECTIONS = [
     {
-        "name": "ongoing-matches",
+        "name": "match-started",
         "aoe2_url": "wss://socket.aoe2companion.com/listen?handler=match-started",
         "local_host": "0.0.0.0",
         "local_port": 8765,
     },
     {
-        "name": "lobbies",
+        "name": "match-finished",
         "aoe2_url": "wss://socket.aoe2companion.com/listen?handler=match-finished",
         "local_host": "0.0.0.0",
         "local_port": 8766,
+    },
+    {
+        "name": "lobbies",
+        "aoe2_url": "wss://socket.aoe2companion.com/listen?handler=lobbies",
+        "local_host": "0.0.0.0",
+        "local_port": 8767,
     },
 ]
 
