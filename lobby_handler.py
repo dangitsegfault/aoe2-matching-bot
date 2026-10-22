@@ -1,5 +1,5 @@
 from database_handler import db
-from discord_bot import bot
+from itertools import combinations
 
 class LobbyHandler:
     def __init__(self):
@@ -52,7 +52,11 @@ class LobbyHandler:
                         slots = self.lobbies[lobby_id]["slots"]
 
                         if slot_id in slots:
-                            slots[slot_id].update(lobby_data)
+                            if (lobby_data.get("name") == "Closed"):
+                                self.lobbies[lobby_id]["slots"].pop(slot_id, None)
+
+                            else:
+                                slots[slot_id].update(lobby_data)
 
                 case "slotRemoved":
                     if lobby_id in self.lobbies:
@@ -108,3 +112,63 @@ class LobbyHandler:
 
     def make_lobby_ended_message(self, lobby_data):
         return f"Lobby `{lobby_data['lobbyId']}` has ended."
+
+    def balance_lobby (self, lobby_id):
+        players = []
+        lobby = self.lobbies.get(lobby_id)
+
+        if not lobby:
+            return None
+
+        for slot in lobby["slots"].values():
+            if slot.get("profileId"):
+                players.append(slot)
+
+        player_count = len (players)
+
+        if player_count < 2:
+            return None
+
+        player_team_1 = player_count // 2
+        player_team_2 = player_count - player_team_1
+
+        if any(player["rating"] is None for player in players):
+            return None
+
+        best_split = None
+        best_difference = float("inf")
+
+        # Generate every possible Team 1 combination.
+        for team_a_tuple in combinations(players, player_team_1):
+            team_a = list(team_a_tuple)
+
+            # Avoid checking mirrored team splits twice.
+            if players[0] not in team_a:
+                continue
+
+            team_a_ids = {p["profileId"] for p in team_a}
+
+            team_b = [
+                p for p in players
+                if p["profileId"] not in team_a_ids
+            ]
+
+            average_a = sum(p["rating"] for p in team_a) / player_team_1
+            average_b = sum(p["rating"] for p in team_b) / player_team_2
+
+            difference = abs(average_a - average_b)
+
+            if difference < best_difference:
+                best_difference = difference
+                best_split = {
+                    "team_a": team_a,
+                    "team_b": team_b,
+                    "average_a": average_a,
+                    "average_b": average_b,
+                    "elo_difference": best_difference,
+                }
+
+        return best_split
+        
+
+lobby_handler = LobbyHandler ()

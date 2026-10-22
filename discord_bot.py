@@ -3,6 +3,7 @@ from discord import app_commands
 from database_handler import db
 import os
 import io
+from lobby_handler import lobby_handler
 
 REDIRECT_URL = os.environ ["REDIRECT_URL"]
 DEV_GUILD_ID = os.environ.get("DEV_GUILD_ID")
@@ -210,10 +211,12 @@ async def register(
 )
 @app_commands.checks.has_permissions(administrator=True)
 async def members(interaction: discord.Interaction):
+    await interaction.response.defer()
+
     members = db.read_all_members_by_guild (interaction.guild.id)
 
     if not members:
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "No members are registered.",
             ephemeral=True
         )
@@ -233,9 +236,9 @@ async def members(interaction: discord.Interaction):
         for profile_id in profile_ids:
             lines.append(f"  └─ `{profile_id}`")
 
-    await interaction.response.send_message("\n".join(lines),
-                                            ephemeral=True
-                                            )
+    await interaction.followup.send("\n".join(lines),
+                                    ephemeral=True
+                                    )
 
 @bot.tree.command(
     name="unregister",
@@ -360,3 +363,47 @@ async def set_lobby_channel(interaction: discord.Interaction):
         f"Lobby channel set to {interaction.channel.mention}.",
         ephemeral=True
     )
+
+@bot.tree.command(
+    name="balance_lobby",
+    description="Calculate the most balanced teams for a lobby"
+)
+@app_commands.describe(lobby_id="ID of lobby to balance")
+async def balance_lobby(
+    interaction: discord.Interaction,
+    lobby_id: int,
+):
+    await interaction.response.defer()
+
+    result = lobby_handler.balance_lobby(lobby_id)
+
+    if result is None:
+        await interaction.followup.send(
+            f"Could not balance lobby `{lobby_id}`. "
+            "Check that it exists, has at least two players, "
+            "and every player has a rating.",
+            ephemeral=True,
+        )
+        return
+
+    team_a_text = "\n".join(
+        f"• {p['name']} ({p['rating']})"
+        for p in result["team_a"]
+    )
+
+    team_b_text = "\n".join(
+        f"• {p['name']} ({p['rating']})"
+        for p in result["team_b"]
+    )
+
+    message = (
+        f"**Balanced Teams — Lobby `{lobby_id}`**\n\n"
+        f"**Team 1** — Average Elo: {result['average_a']:.1f}\n"
+        f"{team_a_text}\n\n"
+        f"**Team 2** — Average Elo: {result['average_b']:.1f}\n"
+        f"{team_b_text}\n\n"
+        f"**Average Elo difference:** "
+        f"{result['elo_difference']:.1f}"
+    )
+
+    await interaction.followup.send(message)

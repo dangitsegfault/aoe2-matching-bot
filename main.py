@@ -2,7 +2,7 @@ import asyncio
 from discord_bot import bot
 import os
 from match_handler import MatchHandler
-from lobby_handler import LobbyHandler
+from lobby_handler import lobby_handler
 from websocket_handler import WebSocketHandler
 
 BOT_TOKEN = os.environ ["DISCORD_TOKEN"]
@@ -11,7 +11,6 @@ WS_MATCH_FINISHED_URL = "ws://host.containers.internal:8766" if os.getenv ("TEST
 WS_LOBBIES_URL = "ws://host.containers.internal:8767" if os.getenv ("TESTING") else "wss://socket.aoe2companion.com/listen?handler=lobbies"
 
 match_handler = MatchHandler ()
-lobby_handler = LobbyHandler ()
 match_started_websocket_handler = WebSocketHandler (
     WS_MATCH_STARTED_URL,
     match_handler.parse_matches_started)
