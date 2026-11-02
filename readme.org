@@ -12,3 +12,4 @@ The map icons are found at ~resources/_common/wpfg/resources/mapicons~
 - [ ] Update the schema to use ON_DELETE CASCADE on guild_id foreign key.
 - [ ] Add support for names in language other than English. Chinese is the first one to add support for.
 - [ ] Add CI/CD for the bot.
+- [ ] When I send a message to multiple servers, I have to delete it from all. Some of them might not get deleted for some reason. So I need to add a retry option for this. Or may be just mark a match data to be deleted and run a delete routine that will periodically revisit if a match data needs deletion.
