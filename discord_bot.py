@@ -121,14 +121,24 @@ class DiscordBot(discord.Client):
         print(f"  resolved channel: {channel}")
 
         filename = f"match_{match_id}.png"
-        file = discord.File(io.BytesIO(image.getvalue()), filename=filename)
 
         try:
-            message = await channel.send(
-                content=content,
-                file=file,
-                view=self.make_match_started_view(match_id),
-            )
+            if image is not None:
+                file = discord.File(
+                    io.BytesIO(image.getvalue()),
+                    filename=filename,
+                )
+
+                message = await channel.send(
+                    content=content,
+                    file=file,
+                    view=self.make_match_started_view(match_id),
+                )
+            else:
+                message = await channel.send(
+                    content=content,
+                    view=self.make_match_started_view(match_id),
+                )
             print(f"  sent message {message.id}")
         except discord.HTTPException as e:
             print(f"  Failed to send match message: {e}")
@@ -170,6 +180,39 @@ class DiscordBot(discord.Client):
             print(f"  sent updated {message.id}")
         except discord.HTTPException as e:
             print(f"  Failed to update match message: {e}")
+            return False
+
+        return True
+
+    async def delete_match_message(self, message_id, guild_id, match_id):
+        print(f"delete_match_message called for match {match_id}, guild {guild_id}")
+
+        settings = db.get_channel_ids(guild_id)
+        if settings is None:
+            print(f"  no channel settings for guild {guild_id}")
+            return None
+
+        channel_id = settings["spectate_channel_id"]
+        if channel_id is None:
+            print(f"  spectate_channel_id not set for guild {guild_id}")
+            return None
+
+        channel = self.get_channel(channel_id)
+        if channel is None:
+            channel = await self.fetch_channel(channel_id)
+        print(f"  resolved channel: {channel}")
+
+        try:
+            message = await channel.fetch_message(message_id)
+            await message.delete()
+            print(f"  message deleted: {message_id}")
+
+        except discord.NotFound:
+            print(f"  message {message_id} was not found")
+            return False
+
+        except discord.HTTPException as e:
+            print(f"  failed to delete match message: {e}")
             return False
 
         return True

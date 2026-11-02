@@ -26,6 +26,12 @@ CONNECTIONS = [
         "local_host": "0.0.0.0",
         "local_port": 8767,
     },
+    {
+        "name": "queueing",
+        "aoe2_url": "wss://socket.aoe2companion.com/listen?handler=queueing",
+        "local_host": "0.0.0.0",
+        "local_port": 8768,
+    },
 ]
 
 

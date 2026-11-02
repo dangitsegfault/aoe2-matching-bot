@@ -9,6 +9,7 @@ BOT_TOKEN = os.environ ["DISCORD_TOKEN"]
 WS_MATCH_STARTED_URL = "ws://host.containers.internal:8765" if os.getenv ("TESTING") else "wss://socket.aoe2companion.com/listen?handler=match-started"
 WS_MATCH_FINISHED_URL = "ws://host.containers.internal:8766" if os.getenv ("TESTING") else "wss://socket.aoe2companion.com/listen?handler=match-finished"
 WS_LOBBIES_URL = "ws://host.containers.internal:8767" if os.getenv ("TESTING") else "wss://socket.aoe2companion.com/listen?handler=lobbies"
+WS_QUEUING_URL = "ws://host.containers.internal:8768" if os.getenv ("TESTING") else "wss://socket.aoe2companion.com/listen?handler=queueing"
 
 match_handler = MatchHandler ()
 match_started_websocket_handler = WebSocketHandler (
@@ -19,6 +20,9 @@ match_finished_websocket_handler = WebSocketHandler (
     match_handler.parse_matches_finished)
 lobbies_websocket_handler = WebSocketHandler (
     WS_LOBBIES_URL,
+    lobby_handler.parse_lobbies)
+queueing_websocket_handler = WebSocketHandler (
+    WS_QUEUING_URL,
     lobby_handler.parse_lobbies)
 
 

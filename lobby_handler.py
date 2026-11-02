@@ -65,15 +65,10 @@ class LobbyHandler:
 
                 case _:
                     print(
-                        "Unknown event_type: {}".format(event_type)
+                        "Unknown lobby event_type: {}".format(event_type)
                     )
 
-        await self.print_interested_lobbies()
-
-    # async def print_interested_lobbies(self):
-    #     for lobby in self.lobbies:
-    #         if self.has_member (lobby):
-    #             print (f"Lobby [{lobby["matchId"]}] contains an interested player")
+        # await self.print_interested_lobbies()
 
     async def print_interested_lobbies(self):
         for lobby_id, lobby in self.lobbies.items():
