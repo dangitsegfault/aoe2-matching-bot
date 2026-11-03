@@ -57,10 +57,7 @@ class MatchHandler:
 
                     match queue_status:
                         case "queueing":
-                            self.queues[queue_id] = {
-                            "data": queue_data,
-                            "messages": {},
-                            }
+                            continue
 
                         case "matched":
                             if queue_id not in self.queues:
@@ -103,15 +100,15 @@ class MatchHandler:
                                 "unknown queueing status: {}".format(queue_status)
                             )
 
-                case "queueUpdated":
+                case "queueingUpdated":
                     if queue_id in self.queues:
                         self.queues[queue_id]["data"].update(queue_data)
 
-                case "queueRemoved":
+                case "queueingRemoved":
                     removal_reason = queue_data["reason"]
 
                     match removal_reason:
-                        case "started" | "left" | "cancelled":
+                        case "matched" | "left" | "cancelled":
                             # check if a message has been sent to the discord related to the queue id
                             # if yes, then delete that message
                             # and after that
@@ -140,7 +137,7 @@ class MatchHandler:
                             if all_deleted:
                                 self.queues.pop(queue_id, None)
 
-                        case "matched":
+                        case "started":
                             # check if a message has been sent to the discord related to the queue id
                             # if yes, then transfer the control of updating that match id to self.matches
                             continue # let the match started function handle this
@@ -157,6 +154,29 @@ class MatchHandler:
                     )
 
         # await self.print_interested_queues()
+
+    async def print_interested_queues(self):
+        for queue_id, queue in self.queues.items():
+            players = ", ".join(
+                player.get("name", "Unknown")
+                for player in queue["data"]["players"]
+            )
+            interest = (
+                "an interesting player"
+                if self.queue_has_member(queue)
+                else "no interesting player"
+            )
+
+            print(
+                f"Match [{queue['data']['matchId']}] is in queue "
+                f"with players {players} and contains {interest}"
+            )
+
+    def queue_has_member(self, queue):
+        return any(
+            db.is_profile_registered(player.get("profileId"))
+            for player in queue["data"]["players"]
+        )
 
     async def parse_matches_started(self, started_matches):
         for match_data in started_matches:

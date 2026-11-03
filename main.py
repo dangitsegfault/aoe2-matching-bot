@@ -23,13 +23,14 @@ lobbies_websocket_handler = WebSocketHandler (
     lobby_handler.parse_lobbies)
 queueing_websocket_handler = WebSocketHandler (
     WS_QUEUING_URL,
-    lobby_handler.parse_lobbies)
+    match_handler.parse_matches_queued)
 
 
 async def main():
     await asyncio.gather(
         match_started_websocket_handler.run(),
         match_finished_websocket_handler.run(),
+        queueing_websocket_handler.run(),
         lobbies_websocket_handler.run(),
         # lobby_handler.print_interested_lobbies(),
         bot.start(BOT_TOKEN),
