@@ -505,7 +505,7 @@ def make_match_image(match_data):
 
     teams_image_merged = None
 
-    if team_count < 3 and max_player_per_team < 3:
+    if team_count == 2 and max_player_per_team < 3:
         vs_text = "Vs"
         bbox = vs_font.getbbox(vs_text)
 

@@ -82,6 +82,8 @@ class MatchHandler:
                             if not guild_ids:
                                 continue
 
+                            print ("sending queue message")
+
                             content = self.make_match_queued_content(queue_data)
                             match_id = queue_data["matchId"]
 
@@ -94,6 +96,7 @@ class MatchHandler:
                                 )
 
                                 if message_id is not None:
+                                    print (f"sent queue message [{message_id}] to {guild_id}")
                                     self.queues[queue_id]["messages"][guild_id] = message_id
                         case _:
                             print(
@@ -140,8 +143,32 @@ class MatchHandler:
                         case "started":
                             # check if a message has been sent to the discord related to the queue id
                             # if yes, then transfer the control of updating that match id to self.matches
-                            continue # let the match started function handle this
+                            # if not, remove the match informaton from self.queues
+                            # when handeling control over, if the self.matches already have an item containing same match id, update its messages field with the one in the queue, if not then make a new item in self.matches using match id as the key then delete the item from self.queues
+                            queue = self.queues.get(queue_id)
 
+                            if queue is None:
+                                continue
+
+                            if not queue.get("messages"):
+                                self.queues.pop(queue_id, None)
+                                continue
+
+                            match_id = queue["data"]["matchId"]
+                            paired_match = self.matches.get (match_id)
+
+                            if paired_match:
+                                paired_match["messages"] = queue["messages"].copy()
+                                paired_match["update-messages"] = True
+                                self.queues.pop(queue_id, None)
+
+                            else:
+                                self.matches[match_id] = {
+                                    "data": {},
+                                    "messages": queue["messages"].copy(),
+                                    "update-messages": True,
+                                }
+                                self.queues.pop(queue_id, None)
 
                         case _:
                             print(
@@ -158,7 +185,7 @@ class MatchHandler:
     async def print_interested_queues(self):
         for queue_id, queue in self.queues.items():
             players = ", ".join(
-                player.get("name", "Unknown")
+                player.get("name") or "Unknown"
                 for player in queue["data"]["players"]
             )
             interest = (
@@ -189,90 +216,87 @@ class MatchHandler:
             if match_id in self.matches:
                 # Existing match: update its data but preserve message_id.
                 self.matches[match_id]["data"] = match_data
-                continue
 
-            # New match.
-
-            # check if self.queues have data related to this match
-            queue_id = None
-            for queue_id, queue in self.queues.items():
-                if not queue["data"]["matchId"] == match_id:
-                    continue
-                
-                messages = queue["messages"]
-
-                if messages:
-                    queue_id = queue["data"]["id"]
-                    break
-
-            if queue_id:
+            else:
                 self.matches[match_id] = {
                     "data": match_data,
-                    "messages": self.queues[queue_id]["messages"].copy()
+                    "messages": {},
+                    "update-messages": True,
                 }
-                self.queues.pop(queue_id, None)
 
-                content = self.make_match_started_content(match_data)
-                image = make_match_image(match_data)
+            # check if self.queues have data related to this match
+            for queue_id, queue in self.queues.items():
+                if queue["data"]["matchId"] == match_id:
+                    self.matches[match_id]["update-messages"] = False
+                    continue
 
-                all_updated = True
-                for guild_id, message_id in self.matches[match_id]["messages"].items():
-                    if message_id is None:
-                        continue
-
-                    message_update_status = await bot.update_match_message(
-                        message_id,
-                        guild_id,
-                        content,
-                        image,
-                        match_id
-                    )
-
-                    if message_update_status is not True:
-                        all_updated = False
-
-                continue
-
-                
 
             # send a message to the server and store its message id
+            match_pointer = self.matches.get (match_id)
+            if match_pointer.get("messages") and match_pointer.get("update-messages"):
+                await self.update_match_message (match_id, match_data)
+                match_pointer["update-messages"] = False               
 
-            guild_ids = set()
+            elif not match_pointer.get("messages") and match_pointer.get("update-messages"):
+                await self.send_new_match_message (match_id, match_data)
+                match_pointer["update-messages"] = False
 
-            # Is anyone in this match one of our registered players?
-            for team in match_data.get("teams") or []:
-                for player in team.get("players") or []:
-                    player_guilds = db.get_guilds_by_profile_id(
-                        player["profileId"]
-                    )
+    async def send_new_match_message (self, match_id, match_data):
+        guild_ids = set()
 
-                    guild_ids.update(player_guilds)
-
-            if not guild_ids:
-                continue
-
-            content = self.make_match_started_content(match_data)
-            image = make_match_image(match_data)
-
-            self.matches[match_id] = {
-                "data": match_data,
-                "messages": {}
-            }
-
-            for guild_id in guild_ids:
-                message_id = await bot.send_match_message(
-                    content,
-                    image,
-                    match_id,
-                    guild_id,
+        # Is anyone in this match one of our registered players?
+        for team in match_data.get("teams") or []:
+            for player in team.get("players") or []:
+                player_guilds = db.get_guilds_by_profile_id(
+                    player["profileId"]
                 )
 
-                if message_id is not None:
-                    self.matches[match_id]["messages"][guild_id] = message_id
+                guild_ids.update(player_guilds)
 
-            if not self.matches[match_id]["messages"]:
-                del self.matches[match_id]
+        if not guild_ids:
+            del self.matches[match_id]
+            return
 
+        content = self.make_match_content(match_data)
+        image = make_match_image(match_data)
+
+        for guild_id in guild_ids:
+            message_id = await bot.send_match_message(
+                content,
+                image,
+                match_id,
+                guild_id,
+            )
+
+            if message_id is not None:
+                self.matches[match_id]["messages"][guild_id] = message_id
+
+
+        self.matches[match_id]["update-messages"] = False
+        
+    async def update_match_message (self, match_id, match_data):
+        content = self.make_match_content(match_data)
+        image = make_match_image(match_data)
+
+        all_updated = True
+
+        for guild_id, message_id in self.matches[match_id]["messages"].items():
+            if message_id is None:
+                continue
+
+            message_update_status = await bot.update_match_message(
+                message_id,
+                guild_id,
+                content,
+                image,
+                match_id
+            )
+
+            if message_update_status is not True:
+                all_updated = False
+
+        return all_updated
+    
     async def parse_matches_finished(self, started_matches):
         for match_data in started_matches:
             match_id = match_data.get("matchId")
@@ -286,25 +310,7 @@ class MatchHandler:
             # update the message on discord to tell the match has finished and delete the match from your lisr
 
             self.matches[match_id]["data"] = match_data 
-            content = self.make_match_finished_content(match_data)
-            image = make_match_image(match_data)
-
-            all_updated = True
-
-            for guild_id, message_id in self.matches[match_id]["messages"].items():
-                if message_id is None:
-                    continue
-
-                message_update_status = await bot.update_match_message(
-                    message_id,
-                    guild_id,
-                    content,
-                    image,
-                    match_id
-                )
-                
-                if message_update_status is not True:
-                    all_updated = False
+            all_updated = await self.update_match_message (match_id, match_data)
 
             if all_updated:
                 del self.matches[match_id]
@@ -322,29 +328,32 @@ class MatchHandler:
         return "\n".join(lines).rstrip()
 
         
-    def make_match_started_content(self, match_data):
-        timestamp = self.get_discord_timestamp(
-            match_data.get("started")
-        )
+    def make_match_content(self, match_data):
+        match_finished = match_data.get("finished")
 
-        lines = [
-            f"Game started <t:{timestamp}:F>",
-            ""
-        ]
+        if match_finished:
+            timestamp = self.get_discord_timestamp(
+                match_data.get("finished")
+            )
 
-        return "\n".join(lines).rstrip()
+            lines = [
+                f"Game finished <t:{timestamp}:F>",
+                ""
+            ]
 
-    def make_match_finished_content(self, match_data):
-        timestamp = self.get_discord_timestamp(
-            match_data.get("finished")
-        )
+            return "\n".join(lines).rstrip()
 
-        lines = [
-            f"Game finished <t:{timestamp}:F>",
-            ""
-        ]
+        else:
+            timestamp = self.get_discord_timestamp(
+                match_data.get("started")
+            )
 
-        return "\n".join(lines).rstrip()
+            lines = [
+                f"Game started <t:{timestamp}:F>",
+                ""
+            ]
+
+            return "\n".join(lines).rstrip()
 
     def get_discord_timestamp(self, value):
         if value is None:
